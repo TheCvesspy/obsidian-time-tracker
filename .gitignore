@@ -1,0 +1,20 @@
+# Build output
+main.js
+
+# Dependencies
+node_modules/
+
+# Release artifacts
+_release/
+
+# IDE
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# TypeScript output
+dist/

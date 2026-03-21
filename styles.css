@@ -1,0 +1,213 @@
+/* Time Tracker Plugin Styles — Uses Obsidian CSS variables for theme compatibility */
+
+/* ── Status Bar Widget ── */
+
+.time-tracker-status-bar {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	cursor: pointer;
+	padding: 0 4px;
+	border-radius: 4px;
+	transition: background 0.15s ease;
+}
+
+.time-tracker-status-bar:hover {
+	background: var(--background-modifier-hover);
+}
+
+.time-tracker-dot {
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	background: var(--color-green, #08b94e);
+	flex-shrink: 0;
+}
+
+.time-tracker-running .time-tracker-dot {
+	animation: time-tracker-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes time-tracker-pulse {
+	0%, 100% { opacity: 1; transform: scale(1); }
+	50% { opacity: 0.5; transform: scale(0.85); }
+}
+
+.time-tracker-status-text {
+	font-size: 12px;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	max-width: 280px;
+}
+
+.time-tracker-idle .time-tracker-status-text {
+	color: var(--text-muted);
+}
+
+.time-tracker-running .time-tracker-status-text {
+	color: var(--text-normal);
+	font-weight: 500;
+}
+
+/* ── Modals ── */
+
+.time-tracker-modal {
+	max-width: 480px;
+}
+
+.time-tracker-modal h3 {
+	margin: 0 0 16px 0;
+	font-size: 16px;
+	font-weight: 600;
+	color: var(--text-normal);
+}
+
+.time-tracker-duration-display {
+	font-size: 14px;
+	font-weight: 600;
+	color: var(--text-accent);
+	padding: 4px 8px;
+	background: var(--background-secondary);
+	border-radius: 4px;
+}
+
+/* ── Weekly Summary Modal ── */
+
+.time-tracker-weekly-modal {
+	max-width: 560px;
+}
+
+.time-tracker-week-nav {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	margin-bottom: 20px;
+}
+
+.time-tracker-nav-btn {
+	background: none;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+	padding: 4px 12px;
+	cursor: pointer;
+	color: var(--text-normal);
+	font-size: 16px;
+	transition: background 0.15s ease;
+}
+
+.time-tracker-nav-btn:hover {
+	background: var(--background-modifier-hover);
+}
+
+.time-tracker-week-title {
+	font-size: 15px;
+	font-weight: 600;
+	color: var(--text-normal);
+}
+
+/* ── Summary Cards ── */
+
+.time-tracker-summary-cards {
+	display: flex;
+	gap: 10px;
+	margin-bottom: 20px;
+}
+
+.time-tracker-summary-card {
+	flex: 1;
+	padding: 12px;
+	background: var(--background-secondary);
+	border-radius: 6px;
+	text-align: center;
+	border: 1px solid var(--background-modifier-border);
+}
+
+.time-tracker-card-value {
+	font-size: 22px;
+	font-weight: 600;
+	color: var(--text-normal);
+}
+
+.time-tracker-card-label {
+	font-size: 11px;
+	color: var(--text-muted);
+	margin-top: 4px;
+}
+
+/* ── Bar Charts ── */
+
+.time-tracker-daily-breakdown,
+.time-tracker-category-breakdown {
+	margin-bottom: 20px;
+}
+
+.time-tracker-daily-breakdown h4,
+.time-tracker-category-breakdown h4 {
+	margin: 0 0 10px 0;
+	font-size: 14px;
+	font-weight: 600;
+	color: var(--text-normal);
+}
+
+.time-tracker-bar-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-bottom: 6px;
+}
+
+.time-tracker-bar-label {
+	min-width: 80px;
+	font-size: 12px;
+	color: var(--text-muted);
+	text-align: right;
+	flex-shrink: 0;
+}
+
+.time-tracker-today-dot {
+	color: var(--interactive-accent);
+	font-weight: 700;
+}
+
+.time-tracker-bar-container {
+	flex: 1;
+	height: 14px;
+	background: var(--background-secondary);
+	border-radius: 3px;
+	overflow: hidden;
+}
+
+.time-tracker-bar {
+	height: 100%;
+	background: var(--interactive-accent);
+	border-radius: 3px;
+	transition: width 0.3s ease;
+	min-width: 0;
+}
+
+.time-tracker-bar-accent {
+	background: var(--interactive-accent);
+	opacity: 0.85;
+}
+
+.time-tracker-bar-value {
+	font-size: 11px;
+	color: var(--text-muted);
+	min-width: 60px;
+	flex-shrink: 0;
+}
+
+/* ── Weekly Actions ── */
+
+.time-tracker-weekly-actions {
+	margin-top: 16px;
+	padding-top: 12px;
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+.time-tracker-weekly-actions .setting-item {
+	border: none;
+	padding: 0;
+}
