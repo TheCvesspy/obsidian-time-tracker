@@ -66,12 +66,12 @@ export class DailySummaryModal extends Modal {
 		// Summary cards
 		const cards = container.createDiv({ cls: 'time-tracker-summary-cards' });
 		this.renderCard(cards, `${this.summary.totalHours}h`, 'Total Hours');
-		this.renderCard(cards, `${this.summary.entries.length}`, 'Entries');
+		this.renderCard(cards, `${this.summary.entries.length}`, 'Logs');
 
 		// Entry list
 		if (this.summary.entries.length > 0) {
 			const entrySection = container.createDiv({ cls: 'time-tracker-daily-breakdown' });
-			entrySection.createEl('h4', { text: 'Entries' });
+			entrySection.createEl('h4', { text: 'Logs' });
 
 			for (const entry of this.summary.entries) {
 				const row = entrySection.createDiv({ cls: 'time-tracker-bar-row' });
@@ -127,7 +127,7 @@ export class DailySummaryModal extends Modal {
 
 		// Empty state
 		if (this.summary.entries.length === 0) {
-			container.createEl('p', { text: 'No time entries for this day.' });
+			container.createEl('p', { text: 'No time logs for this day.' });
 		}
 	}
 

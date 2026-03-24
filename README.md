@@ -1,6 +1,6 @@
 # Time Tracker for Obsidian
 
-A time tracking plugin for Obsidian that helps you stay on top of your hours. Start a timer, pause and resume, get nudged when you forget, quickly log entries, and review your day, week, or month — all from within Obsidian.
+A time tracking plugin for Obsidian that helps you stay on top of your hours. Start a timer, pause and resume, get nudged when you forget, quickly log time, and review your day, week, or month — all from within Obsidian.
 
 ## Features
 
@@ -12,17 +12,17 @@ Need a break? Pause the timer instead of stopping it. The elapsed time freezes, 
 
 ### Quick Logging
 Two ways to capture time:
-- **Timer mode** — start a timer, work, stop it. Entry is saved automatically.
-- **Log Time** — manually log a past entry with start time, end time, and description.
+- **Timer mode** — start a timer, work, stop it. Log is saved automatically.
+- **Log Time** — manually log a past time log with start time, end time, and description.
 
-### Edit & Delete Entries
-Made a mistake? Use the **Edit Time Entry** command to browse entries by date, then edit any field (times, description, category) or delete an entry entirely. Changes are written directly to the markdown table with the total recalculated automatically.
+### Edit & Delete Logs
+Made a mistake? Use the **Edit Time Log** command to browse logs by date, then edit any field (times, description, category) or delete a log entirely. Changes are written directly to the markdown table with the total recalculated automatically.
 
 ### Midnight Crossing
-If a timer runs past midnight, it's automatically split into two entries — one for each day. Daily totals stay accurate.
+If a timer runs past midnight, it's automatically split into two logs — one for each day. Daily totals stay accurate.
 
 ### Daily & Weekly Summaries
-- **Daily Summary** — see today's (or any day's) total hours, entry list, and category breakdown with bar chart visualization. Navigate between days.
+- **Daily Summary** — see today's (or any day's) total hours, log list, and category breakdown with bar chart visualization. Navigate between days.
 - **Weekly Summary** — total hours per day, category breakdown, average per day. Copy as markdown or insert directly into a note. Navigate between weeks.
 - **Monthly Summary** — toggle to monthly view in the Weekly Summary modal for a full month overview with the same visualizations and export options.
 
@@ -33,17 +33,17 @@ The plugin reminds you to track your time when no timer is running. Configurable
 Optional notifications while a timer is running — either at regular intervals or at specific scheduled times throughout the day.
 
 ### Categories
-Define project categories (e.g., "Deep Work", "Meetings", "Admin") that appear as autocomplete suggestions when logging time. Free-text entry is also supported. New categories you type are automatically learned and added to the suggestion list.
+Define project categories (e.g., "Deep Work", "Meetings", "Admin") that appear as autocomplete suggestions when logging time. Free-text input is also supported. New categories you type are automatically learned and added to the suggestion list.
 
 ### Daily Notes Integration
 The plugin detects your daily note setup with this priority:
-1. **BuJo Task Manager** — if installed and enabled, entries go into BuJo daily notes
-2. **Obsidian Daily Notes** — if the core Daily Notes plugin is enabled, entries go there (respects your folder and date format settings)
+1. **BuJo Task Manager** — if installed and enabled, logs go into BuJo daily notes
+2. **Obsidian Daily Notes** — if the core Daily Notes plugin is enabled, logs go there (respects your folder and date format settings)
 3. **Standalone** — creates its own daily notes at a configurable path
 
-## Time Entry Format
+## Time Log Format
 
-Entries are stored as standard markdown tables in daily notes:
+Logs are stored as standard markdown tables in daily notes:
 
 ```markdown
 ## Time Log
@@ -62,12 +62,12 @@ Everything stays in plain markdown. No proprietary formats, no lock-in.
 | Command | Description |
 |---------|-------------|
 | **Start Timer** | Open modal to start tracking a task |
-| **Stop Timer** | Stop the running timer and save the entry |
+| **Stop Timer** | Stop the running timer and save the log |
 | **Pause Timer** | Pause the running timer (preserves elapsed time) |
 | **Resume Timer** | Resume a paused timer |
 | **Toggle Timer** | Cycle: idle → start, running → pause, paused → resume |
-| **Log Time** | Manually log a past time entry |
-| **Edit Time Entry** | Edit or delete entries for any date |
+| **Log Time** | Manually log a past time log |
+| **Edit Time Log** | Edit or delete logs for any date |
 | **Daily Summary** | View today's summary with navigation |
 | **Weekly Summary** | Open the weekly/monthly report modal |
 | **Open Today's Time Log** | Navigate to today's daily note |
@@ -142,7 +142,7 @@ See [agents.md](agents.md) for detailed architecture documentation.
 
 ## Design Principles
 
-- **Everything in markdown** — no binary state, no database. All time entries are readable, editable, and portable.
+- **Everything in markdown** — no binary state, no database. All time logs are readable, editable, and portable.
 - **Configurable over hardcoded** — sensible defaults, but nothing is locked in.
 - **Non-destructive** — only writes within the `## Time Log` section. Never touches your other content. Safe to uninstall at any time.
 - **Integration-aware** — detects BuJo and Obsidian Daily Notes automatically, works standalone when neither is present.

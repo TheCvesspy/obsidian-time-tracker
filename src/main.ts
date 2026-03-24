@@ -125,8 +125,8 @@ export default class TimeTrackerPlugin extends Plugin {
 		});
 
 		this.addCommand({
-			id: 'edit-time-entry',
-			name: 'Edit Time Entry',
+			id: 'edit-time-log',
+			name: 'Edit Time Log',
 			callback: () => new EditEntryModal(this).open(),
 		});
 
@@ -210,7 +210,7 @@ export default class TimeTrackerPlugin extends Plugin {
 		new Notice('Timer resumed');
 	}
 
-	/** Stop the running timer and save the entry */
+	/** Stop the running timer and save the log */
 	async stopTimer(): Promise<void> {
 		if (!this.timerService.isRunning) {
 			new Notice('No timer is running.');
@@ -232,15 +232,15 @@ export default class TimeTrackerPlugin extends Plugin {
 				totalHours = Math.round(totalHours * 100) / 100;
 
 				if (entries.length > 1) {
-					new Notice(`Logged ${totalHours}h across ${entries.length} entries (midnight split): ${entries[0].description}`);
+					new Notice(`Logged ${totalHours}h across ${entries.length} logs (midnight split): ${entries[0].description}`);
 				} else {
 					new Notice(`Logged ${totalHours}h: ${entries[0].description}`);
 				}
 			} catch (err) {
-				console.error('Time Tracker: Failed to save entry', err);
+				console.error('Time Tracker: Failed to save time log', err);
 				const entry = entries[0];
 				new Notice(
-					`Failed to save time entry. Please log manually:\n${entry.startTime}-${entry.endTime} (${entry.durationHours}h) ${entry.description}`,
+					`Failed to save time log. Please log manually:\n${entry.startTime}-${entry.endTime} (${entry.durationHours}h) ${entry.description}`,
 					15_000
 				);
 			}
@@ -248,7 +248,7 @@ export default class TimeTrackerPlugin extends Plugin {
 		}
 	}
 
-	/** Add a manual time entry (called from QuickLogModal) */
+	/** Add a manual time log (called from QuickLogModal) */
 	async addManualEntry(entry: TimeEntry): Promise<void> {
 		await this.timeEntryService.addEntry(entry);
 		new Notice(`Logged ${entry.durationHours}h: ${entry.description}`);

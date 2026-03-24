@@ -87,7 +87,7 @@ export class TimerService {
 		this.startUIUpdates();
 	}
 
-	/** Stop the timer and return the completed time entry/entries (split if crossing midnight) */
+	/** Stop the timer and return the completed time log(s) (split if crossing midnight) */
 	async stop(): Promise<TimeEntry[] | null> {
 		const state = this.getState();
 		if (!state.isRunning) return null;
@@ -111,12 +111,12 @@ export class TimerService {
 
 		this.stopUIUpdates();
 
-		// Check if the entry crosses midnight
+		// Check if the log crosses midnight
 		if (this.isSameDay(startDate, endDate)) {
 			return [this.buildEntry(startDate, endDate, state.currentDescription, state.currentCategory)];
 		}
 
-		// Split at midnight: entry 1 ends at 23:59, entry 2 starts at 00:00
+		// Split at midnight: log 1 ends at 23:59, log 2 starts at 00:00
 		const midnight = new Date(endDate);
 		midnight.setHours(0, 0, 0, 0);
 

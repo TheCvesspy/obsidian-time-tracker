@@ -16,7 +16,7 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName('Integrate with BuJo plugin')
-			.setDesc('When enabled and BuJo is installed, time entries are added to BuJo daily notes.')
+			.setDesc('When enabled and BuJo is installed, time logs are added to BuJo daily notes.')
 			.addToggle(toggle => {
 				toggle.setValue(this.plugin.settings.enableBuJoIntegration)
 					.onChange(async val => {
@@ -42,7 +42,7 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName('Integrate with Obsidian Daily Notes')
-			.setDesc('When enabled and Obsidian Daily Notes core plugin is active, time entries are added to its daily notes. Lower priority than BuJo.')
+			.setDesc('When enabled and Obsidian Daily Notes core plugin is active, time logs are added to its daily notes. Lower priority than BuJo.')
 			.addToggle(toggle => {
 				toggle.setValue(this.plugin.settings.enableObsidianDailyNotesIntegration)
 					.onChange(async val => {

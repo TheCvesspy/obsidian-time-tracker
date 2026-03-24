@@ -34,7 +34,7 @@ export class EditEntryModal extends Modal {
 		const { contentEl } = this;
 		contentEl.empty();
 		contentEl.addClass('time-tracker-modal');
-		contentEl.createEl('h3', { text: 'Edit Time Entry' });
+		contentEl.createEl('h3', { text: 'Edit Time Log' });
 
 		new Setting(contentEl)
 			.setName('Date')
@@ -62,7 +62,7 @@ export class EditEntryModal extends Modal {
 		if (oldEmpty) oldEmpty.remove();
 
 		if (this.entries.length === 0) {
-			contentEl.createEl('p', { text: 'No time entries for this date.', cls: 'time-tracker-no-entries' });
+			contentEl.createEl('p', { text: 'No time logs for this date.', cls: 'time-tracker-no-entries' });
 			return;
 		}
 
@@ -106,7 +106,7 @@ export class EditEntryModal extends Modal {
 		const { contentEl } = this;
 		contentEl.empty();
 		contentEl.addClass('time-tracker-modal');
-		contentEl.createEl('h3', { text: 'Edit Time Entry' });
+		contentEl.createEl('h3', { text: 'Edit Time Log' });
 
 		new Setting(contentEl)
 			.setName('Start time')
@@ -225,7 +225,7 @@ export class EditEntryModal extends Modal {
 			updated
 		);
 		this.plugin.refreshStatusBar();
-		new Notice(`Updated entry: ${updated.durationHours}h - ${updated.description}`);
+		new Notice(`Updated log: ${updated.durationHours}h - ${updated.description}`);
 	}
 
 	private async confirmDelete(entry: TimeEntry): Promise<void> {
@@ -237,7 +237,7 @@ export class EditEntryModal extends Modal {
 		const { contentEl } = this;
 		contentEl.empty();
 		contentEl.addClass('time-tracker-modal');
-		contentEl.createEl('h3', { text: 'Delete Time Entry' });
+		contentEl.createEl('h3', { text: 'Delete Time Log' });
 		contentEl.createEl('p', {
 			text: `Are you sure you want to delete "${label}" (${entry.startTime} - ${entry.endTime})?`,
 		});
@@ -250,7 +250,7 @@ export class EditEntryModal extends Modal {
 					this.close();
 					await this.plugin.timeEntryService.deleteEntry(entry.date, entry.startTime);
 					this.plugin.refreshStatusBar();
-					new Notice(`Deleted entry: ${label}`);
+					new Notice(`Deleted log: ${label}`);
 				});
 		});
 		btnRow.addButton(btn => {

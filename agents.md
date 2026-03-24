@@ -16,13 +16,13 @@ This document describes the plugin's architecture, file structure, and all publi
 TimeTrackerPlugin (main.ts)
 ├── DailyNoteIntegration (services/)  — resolves daily note paths, BuJo + Obsidian Daily Notes detection
 ├── TimerService (services/)          — timer state machine with pause/resume + persistence
-├── TimeEntryService (services/)      — CRUD for markdown table entries + category auto-learning
+├── TimeEntryService (services/)      — CRUD for markdown table logs + category auto-learning
 ├── ReminderService (services/)       — idle nudges + active timer notifications
 ├── ReportService (services/)         — daily/weekly/monthly summary computation
 ├── StatusBarWidget (ui/)             — status bar timer display + daily total
 ├── TimerModal (ui/)                  — modal for starting a timer
-├── QuickLogModal (ui/)               — modal for manual time entry (Log Time)
-├── EditEntryModal (ui/)             — modal for editing/deleting entries (any date)
+├── QuickLogModal (ui/)               — modal for manual time log (Log Time)
+├── EditEntryModal (ui/)             — modal for editing/deleting logs (any date)
 ├── DailySummaryModal (ui/)          — modal for daily summary with navigation
 ├── WeeklySummaryModal (ui/)          — modal for weekly/monthly report view
 ├── CategorySuggest (ui/)             — datalist autocomplete for categories
@@ -41,14 +41,14 @@ src/
   services/
     DailyNoteIntegration.ts  — BuJo + Obsidian Daily Notes detection, path resolution, section management
     TimerService.ts          — Timer start/stop/pause/resume, midnight split, persistence across restarts
-    TimeEntryService.ts      — Add/read/update/delete time entries in markdown tables, category auto-learning
+    TimeEntryService.ts      — Add/read/update/delete time logs in markdown tables, category auto-learning
     ReminderService.ts       — Idle nudges + active timer reminders (interval & schedule)
     ReportService.ts         — Daily/weekly/monthly summary computation, markdown export
   ui/
     StatusBarWidget.ts       — Status bar with daily total, paused state, context menu
     TimerModal.ts            — Start timer modal (description + category)
     QuickLogModal.ts         — Log Time modal (date, start, end, description, category)
-    EditEntryModal.ts        — Edit/delete entries with date picker (any date)
+    EditEntryModal.ts        — Edit/delete logs with date picker (any date)
     DailySummaryModal.ts     — Daily summary modal with day navigation
     WeeklySummaryModal.ts    — Weekly/monthly report modal with bar charts and toggle
     CategorySuggest.ts       — HTML datalist-based category autocomplete
@@ -140,7 +140,7 @@ interface MonthlySummary { month, days, totalHours, byCategory }
 | `start(description, category): Promise<void>` | Start timer, persists state |
 | `pause(): Promise<void>` | Pause the running timer, accumulate elapsed time |
 | `resume(): Promise<void>` | Resume a paused timer |
-| `stop(): Promise<TimeEntry[] \| null>` | Stop timer, return entries (array for midnight split) |
+| `stop(): Promise<TimeEntry[] \| null>` | Stop timer, return logs (array for midnight split) |
 | `getElapsedMs(): number` | Milliseconds since timer started |
 | `getFormattedElapsed(): string` | Formatted "HH:MM" or "HH:MM:SS" |
 | `onUpdate(callback): void` | Register UI update callback (called every tick) |
@@ -152,12 +152,12 @@ interface MonthlySummary { month, days, totalHours, byCategory }
 | Method | Description |
 |--------|-------------|
 | `setOnNewCategory(callback): void` | Register callback for category auto-learning |
-| `addEntry(entry: TimeEntry): Promise<void>` | Insert entry into daily note table (auto-learns category) |
-| `updateEntry(dateStr, originalStartTime, updated): Promise<void>` | Replace an existing entry row and recalculate total |
-| `deleteEntry(dateStr, startTime): Promise<void>` | Remove an entry row and recalculate total |
-| `getEntriesForDate(dateStr): Promise<TimeEntry[]>` | Parse entries from a daily note |
-| `getEntriesForRange(start, end): Promise<TimeEntry[]>` | Get entries across multiple days (parallelized) |
-| `buildTableRow(entry): string` | Format an entry as a markdown table row |
+| `addEntry(entry: TimeEntry): Promise<void>` | Insert log into daily note table (auto-learns category) |
+| `updateEntry(dateStr, originalStartTime, updated): Promise<void>` | Replace an existing log row and recalculate total |
+| `deleteEntry(dateStr, startTime): Promise<void>` | Remove a log row and recalculate total |
+| `getEntriesForDate(dateStr): Promise<TimeEntry[]>` | Parse logs from a daily note |
+| `getEntriesForRange(start, end): Promise<TimeEntry[]>` | Get logs across multiple days (parallelized) |
+| `buildTableRow(entry): string` | Format a log as a markdown table row |
 
 ### ReminderService
 | Method | Description |
@@ -184,30 +184,30 @@ interface MonthlySummary { month, days, totalHours, byCategory }
 | Command ID | Name | Behavior |
 |-----------|------|----------|
 | `start-timer` | Start Timer | Opens TimerModal; notice if already running |
-| `stop-timer` | Stop Timer | Stops timer, saves entry (auto-splits at midnight); notice if not running |
+| `stop-timer` | Stop Timer | Stops timer, saves log (auto-splits at midnight); notice if not running |
 | `pause-timer` | Pause Timer | Pauses running timer, accumulates elapsed time |
 | `resume-timer` | Resume Timer | Resumes a paused timer |
 | `toggle-timer` | Toggle Timer | Cycles: idle→start, running→pause, paused→resume |
-| `quick-log` | Log Time | Opens QuickLogModal for manual entry |
-| `edit-time-entry` | Edit Time Entry | Opens EditEntryModal with date picker for any date |
+| `quick-log` | Log Time | Opens QuickLogModal for manual log |
+| `edit-time-log` | Edit Time Log | Opens EditEntryModal with date picker for any date |
 | `daily-summary` | Daily Summary | Opens DailySummaryModal with day navigation |
 | `weekly-summary` | Weekly Summary | Opens WeeklySummaryModal (weekly/monthly toggle) |
 | `open-today-time-log` | Open Today's Time Log | Navigates to today's daily note |
 
 ## Data Flow
 
-### Timer → Entry → Markdown
+### Timer → Log → Markdown
 1. User starts timer via modal or status bar click → `TimerService.start()` persists `startedAt` ISO timestamp
 2. Status bar updates every 1s (or 60s) via `setInterval` → `StatusBarWidget.update()`
 3. Idle nudges suppress while timer runs; active reminders fire per settings
 4. User stops timer → `TimerService.stop()` computes duration, returns `TimeEntry`
 5. `TimeEntryService.addEntry()` resolves daily note via `DailyNoteIntegration`
-6. Entry inserted as markdown table row under `## Time Log`, total row updated
-7. On write failure: user gets notice with entry details to log manually
+6. Log inserted as markdown table row under `## Time Log`, total row updated
+7. On write failure: user gets notice with log details to log manually
 
 ### BuJo Integration
 - Detection: `app.plugins.getPlugin('obsidian-task-bujo')`
-- When present: Time entries go into BuJo's daily note file, appending `## Time Log` section
+- When present: Time logs go into BuJo's daily note file, appending `## Time Log` section
 - When absent: Own daily notes at `TimeTracking/Daily/YYYY-MM-DD.md`
 - Time Tracker only touches content within the `## Time Log` section boundary
 
@@ -253,7 +253,7 @@ interface MonthlySummary { month, days, totalHours, byCategory }
 
 ## Known Constraints
 
-- Timer crossing midnight: entry date is the start date; end time may appear < start time
+- Timer crossing midnight: log date is the start date; end time may appear < start time
 - Category parsing uses " - " separator: descriptions starting with a known category name followed by " - " will be split
 - `datalist` autocomplete behavior varies by platform (Electron version)
 - All data is stored in standard markdown files — no binary/database state beyond settings JSON
