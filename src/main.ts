@@ -8,6 +8,8 @@ import { ReportService } from './services/ReportService';
 import { StatusBarWidget } from './ui/StatusBarWidget';
 import { TimerModal } from './ui/TimerModal';
 import { QuickLogModal } from './ui/QuickLogModal';
+import { EditEntryModal } from './ui/EditEntryModal';
+import { DailySummaryModal } from './ui/DailySummaryModal';
 import { WeeklySummaryModal } from './ui/WeeklySummaryModal';
 import { TimeTrackerSettingTab } from './settings';
 
@@ -49,6 +51,14 @@ export default class TimeTrackerPlugin extends Plugin {
 			() => this.settings
 		);
 
+		// Wire category auto-learning
+		this.timeEntryService.setOnNewCategory((cat) => {
+			if (!this.settings.categories.some(c => c.toLowerCase() === cat.toLowerCase())) {
+				this.settings.categories.push(cat);
+				this.saveSettings();
+			}
+		});
+
 		this.reminderService = new ReminderService(
 			this.timerService,
 			() => this.settings
@@ -83,11 +93,25 @@ export default class TimeTrackerPlugin extends Plugin {
 		});
 
 		this.addCommand({
+			id: 'pause-timer',
+			name: 'Pause Timer',
+			callback: () => this.pauseTimer(),
+		});
+
+		this.addCommand({
+			id: 'resume-timer',
+			name: 'Resume Timer',
+			callback: () => this.resumeTimer(),
+		});
+
+		this.addCommand({
 			id: 'toggle-timer',
 			name: 'Toggle Timer',
 			callback: () => {
-				if (this.timerService.isRunning) {
-					this.stopTimer();
+				if (this.timerService.isRunning && this.timerService.isPaused) {
+					this.resumeTimer();
+				} else if (this.timerService.isRunning) {
+					this.pauseTimer();
 				} else {
 					this.startTimerInteractive();
 				}
@@ -96,8 +120,20 @@ export default class TimeTrackerPlugin extends Plugin {
 
 		this.addCommand({
 			id: 'quick-log',
-			name: 'Quick Log Entry',
+			name: 'Log Time',
 			callback: () => new QuickLogModal(this).open(),
+		});
+
+		this.addCommand({
+			id: 'edit-time-entry',
+			name: 'Edit Time Entry',
+			callback: () => new EditEntryModal(this).open(),
+		});
+
+		this.addCommand({
+			id: 'daily-summary',
+			name: 'Daily Summary',
+			callback: () => new DailySummaryModal(this).open(),
 		});
 
 		this.addCommand({
@@ -115,15 +151,16 @@ export default class TimeTrackerPlugin extends Plugin {
 		// Settings tab
 		this.addSettingTab(new TimeTrackerSettingTab(this.app, this));
 
-		// On layout ready: resume timer, start reminders
+		// On layout ready: resume timer, start reminders, refresh daily total
 		this.app.workspace.onLayoutReady(() => {
 			this.timerService.resumeIfRunning();
-			if (this.timerService.isRunning) {
+			if (this.timerService.isRunning && !this.timerService.isPaused) {
 				this.reminderService.startActiveReminders();
 			}
 			// Always start idle nudges (they only fire when timer is NOT running)
 			this.reminderService.startIdleNudges();
 			this.statusBarWidget?.update();
+			this.statusBarWidget?.refreshDailyTotal();
 		});
 	}
 
@@ -149,6 +186,30 @@ export default class TimeTrackerPlugin extends Plugin {
 		new Notice(`Timer started: ${description}`);
 	}
 
+	/** Pause the running timer */
+	async pauseTimer(): Promise<void> {
+		if (!this.timerService.isRunning || this.timerService.isPaused) {
+			new Notice('No running timer to pause.');
+			return;
+		}
+		await this.timerService.pause();
+		this.reminderService.stopActiveReminders();
+		this.statusBarWidget?.update();
+		new Notice('Timer paused');
+	}
+
+	/** Resume a paused timer */
+	async resumeTimer(): Promise<void> {
+		if (!this.timerService.isRunning || !this.timerService.isPaused) {
+			new Notice('No paused timer to resume.');
+			return;
+		}
+		await this.timerService.resume();
+		this.reminderService.startActiveReminders();
+		this.statusBarWidget?.update();
+		new Notice('Timer resumed');
+	}
+
 	/** Stop the running timer and save the entry */
 	async stopTimer(): Promise<void> {
 		if (!this.timerService.isRunning) {
@@ -156,23 +217,34 @@ export default class TimeTrackerPlugin extends Plugin {
 			return;
 		}
 
-		// Stop timer first to get the entry, but save state only after successful write
-		const entry = await this.timerService.stop();
+		// Stop timer first to get the entries
+		const entries = await this.timerService.stop();
 		this.reminderService.stopActiveReminders();
 		this.statusBarWidget?.update();
 
-		if (entry) {
+		if (entries && entries.length > 0) {
 			try {
-				await this.timeEntryService.addEntry(entry);
-				new Notice(`Logged ${entry.durationHours}h: ${entry.description}`);
+				let totalHours = 0;
+				for (const entry of entries) {
+					await this.timeEntryService.addEntry(entry);
+					totalHours += entry.durationHours ?? 0;
+				}
+				totalHours = Math.round(totalHours * 100) / 100;
+
+				if (entries.length > 1) {
+					new Notice(`Logged ${totalHours}h across ${entries.length} entries (midnight split): ${entries[0].description}`);
+				} else {
+					new Notice(`Logged ${totalHours}h: ${entries[0].description}`);
+				}
 			} catch (err) {
-				// Entry failed to write — notify user so they can log manually
 				console.error('Time Tracker: Failed to save entry', err);
+				const entry = entries[0];
 				new Notice(
 					`Failed to save time entry. Please log manually:\n${entry.startTime}-${entry.endTime} (${entry.durationHours}h) ${entry.description}`,
 					15_000
 				);
 			}
+			await this.refreshStatusBar();
 		}
 	}
 
@@ -180,6 +252,12 @@ export default class TimeTrackerPlugin extends Plugin {
 	async addManualEntry(entry: TimeEntry): Promise<void> {
 		await this.timeEntryService.addEntry(entry);
 		new Notice(`Logged ${entry.durationHours}h: ${entry.description}`);
+		await this.refreshStatusBar();
+	}
+
+	/** Refresh the status bar daily total */
+	async refreshStatusBar(): Promise<void> {
+		await this.statusBarWidget?.refreshDailyTotal();
 	}
 
 	/** Navigate to today's daily note */

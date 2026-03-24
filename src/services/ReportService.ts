@@ -1,4 +1,4 @@
-import { DailySummary, WeeklySummary, PluginSettings } from '../types';
+import { DailySummary, WeeklySummary, MonthlySummary, PluginSettings } from '../types';
 import { TimeEntryService } from './TimeEntryService';
 import { formatDateISO, parseDate, formatDisplayFromISO } from '../utils';
 
@@ -61,6 +61,68 @@ export class ReportService {
 			totalHours: Math.round(totalHours * 100) / 100,
 			byCategory,
 		};
+	}
+
+	/** Get a monthly summary for a given year/month */
+	async getMonthlySummary(year: number, month: number): Promise<MonthlySummary> {
+		// month is 1-based (1=January)
+		const daysInMonth = new Date(year, month, 0).getDate();
+		const dates: string[] = [];
+		for (let d = 1; d <= daysInMonth; d++) {
+			dates.push(formatDateISO(new Date(year, month - 1, d)));
+		}
+
+		const days = await Promise.all(dates.map(d => this.getDailySummary(d)));
+
+		const byCategory: Record<string, number> = {};
+		let totalHours = 0;
+
+		for (const day of days) {
+			totalHours += day.totalHours;
+			for (const [cat, hours] of Object.entries(day.byCategory)) {
+				byCategory[cat] = (byCategory[cat] || 0) + hours;
+			}
+		}
+
+		const monthStr = `${year}-${String(month).padStart(2, '0')}`;
+
+		return {
+			month: monthStr,
+			days,
+			totalHours: Math.round(totalHours * 100) / 100,
+			byCategory,
+		};
+	}
+
+	/** Format a monthly summary as markdown */
+	formatMonthlySummaryMarkdown(summary: MonthlySummary): string {
+		const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+			'July', 'August', 'September', 'October', 'November', 'December'];
+		const [yearStr, monthStr] = summary.month.split('-');
+		const monthName = monthNames[parseInt(monthStr) - 1];
+
+		const lines: string[] = [];
+		lines.push(`# Monthly Summary: ${monthName} ${yearStr}`);
+		lines.push('');
+		lines.push(`**Total Hours:** ${summary.totalHours}h`);
+		lines.push('');
+
+		if (Object.keys(summary.byCategory).length > 0) {
+			lines.push('## By Category');
+			lines.push('');
+			lines.push('| Category | Hours | % |');
+			lines.push('|----------|-------|---|');
+
+			const sorted = Object.entries(summary.byCategory).sort(([, a], [, b]) => b - a);
+			for (const [cat, hours] of sorted) {
+				const pct = summary.totalHours > 0
+					? Math.round((hours / summary.totalHours) * 100)
+					: 0;
+				lines.push(`| ${cat} | ${Math.round(hours * 100) / 100}h | ${pct}% |`);
+			}
+		}
+
+		return lines.join('\n');
 	}
 
 	/** Format a weekly summary as markdown */

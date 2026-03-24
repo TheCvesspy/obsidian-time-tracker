@@ -24,7 +24,7 @@ export class QuickLogModal extends Modal {
 	onOpen(): void {
 		const { contentEl } = this;
 		contentEl.addClass('time-tracker-modal');
-		contentEl.createEl('h3', { text: 'Quick Log Entry' });
+		contentEl.createEl('h3', { text: 'Log Time' });
 
 		new Setting(contentEl)
 			.setName('Date')

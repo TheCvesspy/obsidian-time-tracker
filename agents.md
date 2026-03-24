@@ -14,15 +14,17 @@ This document describes the plugin's architecture, file structure, and all publi
 
 ```
 TimeTrackerPlugin (main.ts)
-├── DailyNoteIntegration (services/)  — resolves daily note paths, BuJo detection
-├── TimerService (services/)          — running timer state machine + persistence
-├── TimeEntryService (services/)      — CRUD for markdown table entries
+├── DailyNoteIntegration (services/)  — resolves daily note paths, BuJo + Obsidian Daily Notes detection
+├── TimerService (services/)          — timer state machine with pause/resume + persistence
+├── TimeEntryService (services/)      — CRUD for markdown table entries + category auto-learning
 ├── ReminderService (services/)       — idle nudges + active timer notifications
-├── ReportService (services/)         — daily/weekly summary computation
-├── StatusBarWidget (ui/)             — status bar timer display
+├── ReportService (services/)         — daily/weekly/monthly summary computation
+├── StatusBarWidget (ui/)             — status bar timer display + daily total
 ├── TimerModal (ui/)                  — modal for starting a timer
-├── QuickLogModal (ui/)               — modal for manual time entry
-├── WeeklySummaryModal (ui/)          — modal for weekly report view
+├── QuickLogModal (ui/)               — modal for manual time entry (Log Time)
+├── EditEntryModal (ui/)             — modal for editing/deleting entries (any date)
+├── DailySummaryModal (ui/)          — modal for daily summary with navigation
+├── WeeklySummaryModal (ui/)          — modal for weekly/monthly report view
 ├── CategorySuggest (ui/)             — datalist autocomplete for categories
 └── TimeTrackerSettingTab (settings.ts) — plugin settings UI
 ```
@@ -37,16 +39,18 @@ src/
   settings.ts          — PluginSettingTab with 5 sections
   utils.ts             — Shared date/time utilities (formatDateISO, parseDate, formatTime12, etc.)
   services/
-    DailyNoteIntegration.ts  — BuJo detection, daily note path resolution, section management
-    TimerService.ts          — Timer start/stop, elapsed time, persistence across restarts
-    TimeEntryService.ts      — Add/read/parse time entries in markdown tables
+    DailyNoteIntegration.ts  — BuJo + Obsidian Daily Notes detection, path resolution, section management
+    TimerService.ts          — Timer start/stop/pause/resume, midnight split, persistence across restarts
+    TimeEntryService.ts      — Add/read/update/delete time entries in markdown tables, category auto-learning
     ReminderService.ts       — Idle nudges + active timer reminders (interval & schedule)
-    ReportService.ts         — Daily/weekly summary computation, markdown export
+    ReportService.ts         — Daily/weekly/monthly summary computation, markdown export
   ui/
-    StatusBarWidget.ts       — Status bar element with pulsing dot, click handler
+    StatusBarWidget.ts       — Status bar with daily total, paused state, context menu
     TimerModal.ts            — Start timer modal (description + category)
-    QuickLogModal.ts         — Manual entry modal (date, start, end, description, category)
-    WeeklySummaryModal.ts    — Weekly report modal with bar charts
+    QuickLogModal.ts         — Log Time modal (date, start, end, description, category)
+    EditEntryModal.ts        — Edit/delete entries with date picker (any date)
+    DailySummaryModal.ts     — Daily summary modal with day navigation
+    WeeklySummaryModal.ts    — Weekly/monthly report modal with bar charts and toggle
     CategorySuggest.ts       — HTML datalist-based category autocomplete
 ```
 
@@ -69,7 +73,9 @@ interface TimeEntry {
 ```typescript
 interface TimerState {
   isRunning: boolean;
+  isPaused: boolean;
   startedAt: string | null;      // ISO timestamp
+  accumulatedMs: number;         // ms accumulated before pauses
   currentDescription: string;
   currentCategory: string | null;
 }
@@ -80,6 +86,7 @@ interface TimerState {
 interface PluginSettings {
   standaloneDailyNotePath: string;       // default: 'TimeTracking/Daily'
   enableBuJoIntegration: boolean;        // default: true
+  enableObsidianDailyNotesIntegration: boolean; // default: true
   buJoDailyNotePathOverride: string;     // default: '' (auto-detect)
   timeLogHeading: string;                // default: '## Time Log'
   categories: string[];                  // default: ['Deep Work', 'Meetings', 'Admin', 'Review', 'Learning']
@@ -107,6 +114,7 @@ enum ReminderMode { Interval = 'interval', Schedule = 'schedule', Off = 'off' }
 ```typescript
 interface DailySummary { date, entries, totalHours, byCategory }
 interface WeeklySummary { weekStart, weekEnd, days, totalHours, byCategory }
+interface MonthlySummary { month, days, totalHours, byCategory }
 ```
 
 ## Service APIs
@@ -115,6 +123,7 @@ interface WeeklySummary { weekStart, weekEnd, days, totalHours, byCategory }
 | Method | Description |
 |--------|-------------|
 | `isBuJoAvailable(): boolean` | Check if BuJo plugin is installed and integration enabled |
+| `isObsidianDailyNotesAvailable(): boolean` | Check if Obsidian core Daily Notes plugin is enabled |
 | `getBuJoDailyNotePath(): string` | Get BuJo's daily note folder path (auto-detect or override) |
 | `getDailyNotePath(date: Date): string` | Get full file path for a date's daily note |
 | `getOrCreateDailyNote(date: Date): Promise<TFile>` | Get or create daily note, ensures Time Log section exists |
@@ -124,11 +133,14 @@ interface WeeklySummary { weekStart, weekEnd, days, totalHours, byCategory }
 ### TimerService
 | Method | Description |
 |--------|-------------|
-| `isRunning: boolean` | Whether timer is currently active |
+| `isRunning: boolean` | Whether timer is currently active (running or paused) |
+| `isPaused: boolean` | Whether timer is paused |
 | `currentDescription: string` | Description of current task |
 | `currentCategory: string \| null` | Category of current task |
 | `start(description, category): Promise<void>` | Start timer, persists state |
-| `stop(): Promise<TimeEntry \| null>` | Stop timer, return completed entry |
+| `pause(): Promise<void>` | Pause the running timer, accumulate elapsed time |
+| `resume(): Promise<void>` | Resume a paused timer |
+| `stop(): Promise<TimeEntry[] \| null>` | Stop timer, return entries (array for midnight split) |
 | `getElapsedMs(): number` | Milliseconds since timer started |
 | `getFormattedElapsed(): string` | Formatted "HH:MM" or "HH:MM:SS" |
 | `onUpdate(callback): void` | Register UI update callback (called every tick) |
@@ -139,7 +151,10 @@ interface WeeklySummary { weekStart, weekEnd, days, totalHours, byCategory }
 ### TimeEntryService
 | Method | Description |
 |--------|-------------|
-| `addEntry(entry: TimeEntry): Promise<void>` | Insert entry into daily note table |
+| `setOnNewCategory(callback): void` | Register callback for category auto-learning |
+| `addEntry(entry: TimeEntry): Promise<void>` | Insert entry into daily note table (auto-learns category) |
+| `updateEntry(dateStr, originalStartTime, updated): Promise<void>` | Replace an existing entry row and recalculate total |
+| `deleteEntry(dateStr, startTime): Promise<void>` | Remove an entry row and recalculate total |
 | `getEntriesForDate(dateStr): Promise<TimeEntry[]>` | Parse entries from a daily note |
 | `getEntriesForRange(start, end): Promise<TimeEntry[]>` | Get entries across multiple days (parallelized) |
 | `buildTableRow(entry): string` | Format an entry as a markdown table row |
@@ -159,7 +174,9 @@ interface WeeklySummary { weekStart, weekEnd, days, totalHours, byCategory }
 |--------|-------------|
 | `getDailySummary(dateStr): Promise<DailySummary>` | Compute summary for one day |
 | `getWeeklySummary(weekStartDate): Promise<WeeklySummary>` | Compute 7-day summary (parallelized) |
-| `formatWeeklySummaryMarkdown(summary): string` | Render summary as markdown |
+| `getMonthlySummary(year, month): Promise<MonthlySummary>` | Compute full month summary (parallelized) |
+| `formatWeeklySummaryMarkdown(summary): string` | Render weekly summary as markdown |
+| `formatMonthlySummaryMarkdown(summary): string` | Render monthly summary as markdown |
 | `getWeekStart(date): Date` | Get start of week containing date |
 
 ## Commands (registered in main.ts)
@@ -167,10 +184,14 @@ interface WeeklySummary { weekStart, weekEnd, days, totalHours, byCategory }
 | Command ID | Name | Behavior |
 |-----------|------|----------|
 | `start-timer` | Start Timer | Opens TimerModal; notice if already running |
-| `stop-timer` | Stop Timer | Stops timer, saves entry; notice if not running |
-| `toggle-timer` | Toggle Timer | Start if idle, stop if running (primary hotkey target) |
-| `quick-log` | Quick Log Entry | Opens QuickLogModal for manual entry |
-| `weekly-summary` | Weekly Summary | Opens WeeklySummaryModal |
+| `stop-timer` | Stop Timer | Stops timer, saves entry (auto-splits at midnight); notice if not running |
+| `pause-timer` | Pause Timer | Pauses running timer, accumulates elapsed time |
+| `resume-timer` | Resume Timer | Resumes a paused timer |
+| `toggle-timer` | Toggle Timer | Cycles: idle→start, running→pause, paused→resume |
+| `quick-log` | Log Time | Opens QuickLogModal for manual entry |
+| `edit-time-entry` | Edit Time Entry | Opens EditEntryModal with date picker for any date |
+| `daily-summary` | Daily Summary | Opens DailySummaryModal with day navigation |
+| `weekly-summary` | Weekly Summary | Opens WeeklySummaryModal (weekly/monthly toggle) |
 | `open-today-time-log` | Open Today's Time Log | Navigates to today's daily note |
 
 ## Data Flow
@@ -203,7 +224,9 @@ interface WeeklySummary { weekStart, weekEnd, days, totalHours, byCategory }
 ```
 
 - Description format: `{category} - {description}` when category is set
-- Total row auto-computed on every insert
+- Total row auto-computed on every insert, update, or delete
+- `TIME_LOG_ROW_REGEX` supports both 24h (`HH:MM`) and 12h (`H:MM AM/PM`) time formats
+- Parsed times are normalized to 24h internally via `parseTimeTo24()`
 - Parsed by `TIME_LOG_ROW_REGEX` and `TOTAL_ROW_REGEX` (see constants.ts)
 
 ## Shared Utilities (src/utils.ts)
@@ -214,6 +237,7 @@ interface WeeklySummary { weekStart, weekEnd, days, totalHours, byCategory }
 | `parseDate(dateStr)` | "YYYY-MM-DD" → Date (local midnight) |
 | `formatTime24(date)` | Date → "HH:MM" |
 | `formatTime12(time24)` | "HH:MM" → "h:MM AM/PM" |
+| `parseTimeTo24(time)` | "HH:MM" or "h:MM AM/PM" → "HH:MM" (24h normalized) |
 | `formatDateDisplay(date)` | Date → "Mon, Mar 16" |
 | `formatDisplayFromISO(str)` | "YYYY-MM-DD" → "Mar 16, 2026" |
 | `isToday(date)` | Check if date is today |

@@ -2,14 +2,30 @@ import { App, TFile } from 'obsidian';
 import { TimeEntry, PluginSettings } from '../types';
 import { DailyNoteIntegration } from './DailyNoteIntegration';
 import { TIME_LOG_ROW_REGEX, TOTAL_ROW_REGEX, TABLE_HEADER, TABLE_SEPARATOR } from '../constants';
-import { formatDateISO, parseDate, formatTime12 } from '../utils';
+import { formatDateISO, parseDate, formatTime12, parseTimeTo24 } from '../utils';
 
 export class TimeEntryService {
+	private onNewCategory: ((category: string) => void) | null = null;
+
 	constructor(
 		private app: App,
 		private dailyNoteIntegration: DailyNoteIntegration,
 		private getSettings: () => PluginSettings
 	) {}
+
+	/** Register a callback to be called when a new category is used */
+	setOnNewCategory(callback: (category: string) => void): void {
+		this.onNewCategory = callback;
+	}
+
+	/** Notify about a new category if it's not already known */
+	private learnCategory(entry: TimeEntry): void {
+		if (!entry.category || !this.onNewCategory) return;
+		const categories = this.getSettings().categories;
+		if (!categories.some(c => c.toLowerCase() === entry.category!.toLowerCase())) {
+			this.onNewCategory(entry.category);
+		}
+	}
 
 	/** Add a time entry to the appropriate daily note */
 	async addEntry(entry: TimeEntry): Promise<void> {
@@ -64,6 +80,7 @@ export class TimeEntryService {
 
 		const newContent = content.substring(0, section.start) + newSectionContent + content.substring(section.end);
 		await this.app.vault.modify(file, newContent);
+		this.learnCategory(entry);
 	}
 
 	/** Parse time entries from a daily note for a given date */
@@ -85,8 +102,8 @@ export class TimeEntryService {
 			const match = TIME_LOG_ROW_REGEX.exec(line.trim());
 			if (!match) continue;
 
-			const startTime = match[1];
-			const endTime = match[2];
+			const startTime = parseTimeTo24(match[1]);
+			const endTime = parseTimeTo24(match[2]);
 			const durationStr = match[3];
 			const description = match[4].trim();
 
@@ -152,6 +169,79 @@ export class TimeEntryService {
 			}
 		}
 		return total;
+	}
+
+	/** Update an existing time entry in the daily note table */
+	async updateEntry(dateStr: string, originalStartTime: string, updated: TimeEntry): Promise<void> {
+		const date = parseDate(dateStr);
+		const path = this.dailyNoteIntegration.getDailyNotePath(date);
+		const file = this.app.vault.getAbstractFileByPath(path);
+		if (!(file instanceof TFile)) return;
+
+		const content = await this.app.vault.read(file);
+		const section = this.dailyNoteIntegration.findTimeLogSection(content);
+		if (!section) return;
+
+		const sectionContent = content.substring(section.start, section.end);
+		const lines = sectionContent.split('\n');
+
+		let replaced = false;
+		for (let i = 0; i < lines.length; i++) {
+			const match = TIME_LOG_ROW_REGEX.exec(lines[i].trim());
+			if (match && parseTimeTo24(match[1]) === originalStartTime) {
+				lines[i] = this.buildTableRow(updated);
+				replaced = true;
+				break;
+			}
+		}
+		if (!replaced) return;
+
+		// Recompute total
+		const totalIdx = lines.findIndex(l => TOTAL_ROW_REGEX.test(l));
+		if (totalIdx >= 0) {
+			const total = this.computeTotalFromLines(lines);
+			lines[totalIdx] = this.buildTotalRow(total);
+		}
+
+		const newContent = content.substring(0, section.start) + lines.join('\n') + content.substring(section.end);
+		await this.app.vault.modify(file, newContent);
+		this.learnCategory(updated);
+	}
+
+	/** Delete a time entry from the daily note table */
+	async deleteEntry(dateStr: string, startTime: string): Promise<void> {
+		const date = parseDate(dateStr);
+		const path = this.dailyNoteIntegration.getDailyNotePath(date);
+		const file = this.app.vault.getAbstractFileByPath(path);
+		if (!(file instanceof TFile)) return;
+
+		const content = await this.app.vault.read(file);
+		const section = this.dailyNoteIntegration.findTimeLogSection(content);
+		if (!section) return;
+
+		const sectionContent = content.substring(section.start, section.end);
+		const lines = sectionContent.split('\n');
+
+		let removed = false;
+		for (let i = 0; i < lines.length; i++) {
+			const match = TIME_LOG_ROW_REGEX.exec(lines[i].trim());
+			if (match && parseTimeTo24(match[1]) === startTime) {
+				lines.splice(i, 1);
+				removed = true;
+				break;
+			}
+		}
+		if (!removed) return;
+
+		// Recompute total
+		const totalIdx = lines.findIndex(l => TOTAL_ROW_REGEX.test(l));
+		if (totalIdx >= 0) {
+			const total = this.computeTotalFromLines(lines);
+			lines[totalIdx] = this.buildTotalRow(total);
+		}
+
+		const newContent = content.substring(0, section.start) + lines.join('\n') + content.substring(section.end);
+		await this.app.vault.modify(file, newContent);
 	}
 
 	/** Parse "Category - Description" format back into parts */

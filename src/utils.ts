@@ -31,6 +31,23 @@ export function formatTime12(time24: string): string {
 	return `${h}:${mStr} ${suffix}`;
 }
 
+/** Parse a time string (24h "HH:MM" or 12h "H:MM AM/PM") to 24h "HH:MM" */
+export function parseTimeTo24(time: string): string {
+	const trimmed = time.trim();
+	const match12 = /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i.exec(trimmed);
+	if (match12) {
+		let h = parseInt(match12[1]);
+		const m = match12[2];
+		const period = match12[3].toUpperCase();
+		if (period === 'AM' && h === 12) h = 0;
+		else if (period === 'PM' && h !== 12) h += 12;
+		return `${String(h).padStart(2, '0')}:${m}`;
+	}
+	// Already 24h format — normalize to 2-digit hour
+	const [hStr, mStr] = trimmed.split(':');
+	return `${String(parseInt(hStr)).padStart(2, '0')}:${mStr}`;
+}
+
 /** Format a display date like "Mon, Mar 16" */
 export function formatDateDisplay(date: Date): string {
 	const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];

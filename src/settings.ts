@@ -41,6 +41,17 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 		}
 
 		new Setting(containerEl)
+			.setName('Integrate with Obsidian Daily Notes')
+			.setDesc('When enabled and Obsidian Daily Notes core plugin is active, time entries are added to its daily notes. Lower priority than BuJo.')
+			.addToggle(toggle => {
+				toggle.setValue(this.plugin.settings.enableObsidianDailyNotesIntegration)
+					.onChange(async val => {
+						this.plugin.settings.enableObsidianDailyNotesIntegration = val;
+						await this.plugin.saveSettings();
+					});
+			});
+
+		new Setting(containerEl)
 			.setName('Standalone daily note path')
 			.setDesc('Used when BuJo integration is disabled or BuJo is not installed.')
 			.addText(text => {

@@ -20,8 +20,12 @@ export interface TimeEntry {
 export interface TimerState {
 	/** Whether the timer is currently running */
 	isRunning: boolean;
-	/** ISO timestamp when timer was started, null if stopped */
+	/** Whether the timer is paused */
+	isPaused: boolean;
+	/** ISO timestamp when timer was started (or resumed), null if stopped */
 	startedAt: string | null;
+	/** Milliseconds accumulated before the current segment (from pauses) */
+	accumulatedMs: number;
 	/** Description of current task */
 	currentDescription: string;
 	/** Category of current task */
@@ -39,6 +43,8 @@ export interface PluginSettings {
 	standaloneDailyNotePath: string;
 	/** Whether to integrate with BuJo plugin when available */
 	enableBuJoIntegration: boolean;
+	/** Whether to integrate with Obsidian's core Daily Notes plugin */
+	enableObsidianDailyNotesIntegration: boolean;
 	/** Manual override for BuJo daily note path (empty = auto-detect from BuJo settings) */
 	buJoDailyNotePathOverride: string;
 	/** Section heading to use in daily notes */
@@ -74,6 +80,7 @@ export interface PluginSettings {
 export const DEFAULT_SETTINGS: PluginSettings = {
 	standaloneDailyNotePath: 'TimeTracking/Daily',
 	enableBuJoIntegration: true,
+	enableObsidianDailyNotesIntegration: true,
 	buJoDailyNotePathOverride: '',
 	timeLogHeading: '## Time Log',
 	categories: ['Deep Work', 'Meetings', 'Admin', 'Review', 'Learning'],
@@ -101,7 +108,9 @@ export const DEFAULT_PLUGIN_DATA: PluginData = {
 	settings: { ...DEFAULT_SETTINGS },
 	timerState: {
 		isRunning: false,
+		isPaused: false,
 		startedAt: null,
+		accumulatedMs: 0,
 		currentDescription: '',
 		currentCategory: null,
 	},
@@ -118,6 +127,14 @@ export interface DailySummary {
 export interface WeeklySummary {
 	weekStart: string;
 	weekEnd: string;
+	days: DailySummary[];
+	totalHours: number;
+	byCategory: Record<string, number>;
+}
+
+export interface MonthlySummary {
+	/** "YYYY-MM" */
+	month: string;
 	days: DailySummary[];
 	totalHours: number;
 	byCategory: Record<string, number>;
