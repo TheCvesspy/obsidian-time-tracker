@@ -28,6 +28,16 @@
 	animation: time-tracker-pulse 1.5s ease-in-out infinite;
 }
 
+.time-tracker-paused .time-tracker-dot {
+	animation: none;
+	background: var(--color-yellow, #e0ac00);
+	opacity: 0.6;
+}
+
+.time-tracker-paused .time-tracker-status-text {
+	color: var(--text-muted);
+}
+
 @keyframes time-tracker-pulse {
 	0%, 100% { opacity: 1; transform: scale(1); }
 	50% { opacity: 0.5; transform: scale(0.85); }
@@ -45,26 +55,28 @@
 	color: var(--text-muted);
 }
 
+/* Goal progress color indicators (idle state) */
+.time-tracker-idle.time-tracker-goal-far .time-tracker-status-text {
+	color: var(--text-muted);
+}
+
+.time-tracker-idle.time-tracker-goal-near .time-tracker-status-text {
+	color: var(--color-yellow, #e0ac00);
+}
+
+.time-tracker-idle.time-tracker-goal-reached .time-tracker-status-text {
+	color: var(--color-green, #08b94e);
+}
+
 .time-tracker-running .time-tracker-status-text {
 	color: var(--text-normal);
 	font-weight: 500;
 }
 
-.time-tracker-paused .time-tracker-dot {
-	background: var(--color-yellow, #e0a500);
-	animation: none;
-}
-
-.time-tracker-paused .time-tracker-status-text {
-	color: var(--text-muted);
-	font-weight: 500;
-	font-style: italic;
-}
-
 /* ── Modals ── */
 
 .time-tracker-modal {
-	max-width: 480px;
+	max-width: 560px;
 }
 
 .time-tracker-modal h3 {
@@ -154,6 +166,36 @@
 	margin-bottom: 20px;
 }
 
+.time-tracker-daily-breakdown .time-tracker-bar-row {
+	margin-bottom: 10px;
+	padding: 6px 0;
+	border-bottom: 1px solid var(--background-modifier-border);
+	align-items: flex-start;
+}
+
+.time-tracker-daily-breakdown .time-tracker-bar-row:last-child {
+	border-bottom: none;
+	margin-bottom: 0;
+}
+
+.time-tracker-daily-breakdown .time-tracker-bar-container {
+	height: auto !important;
+	min-height: 20px;
+	background: none !important;
+	border-radius: 0;
+	overflow: visible !important;
+	display: flex;
+	align-items: center;
+}
+
+.time-tracker-entry-desc {
+	font-size: 13px;
+	line-height: 1.5;
+	color: var(--text-normal);
+	white-space: normal;
+	word-break: break-word;
+}
+
 .time-tracker-daily-breakdown h4,
 .time-tracker-category-breakdown h4 {
 	margin: 0 0 10px 0;
@@ -223,7 +265,187 @@
 	padding: 0;
 }
 
-/* ── View Toggle (Weekly/Monthly) ── */
+/* ── Plugin Notices ── */
+
+.time-tracker-notice {
+	border-left: 4px solid var(--interactive-accent);
+}
+
+.time-tracker-notice-success {
+	border-left-color: var(--color-green, #08b94e);
+}
+
+.time-tracker-notice-error {
+	border-left-color: var(--color-red, #e93147);
+}
+
+.time-tracker-notice-warning {
+	border-left-color: var(--color-yellow, #e0ac00);
+}
+
+.time-tracker-notice-info {
+	border-left-color: var(--interactive-accent);
+}
+
+/* ── Heatmap Modal ── */
+
+.time-tracker-heatmap-modal {
+	max-width: 720px;
+}
+
+.time-tracker-heatmap-wrapper {
+	position: relative;
+	overflow-x: auto;
+}
+
+.time-tracker-heatmap-tooltip {
+	position: absolute;
+	background: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	padding: 4px 8px;
+	font-size: 11px;
+	pointer-events: none;
+	z-index: 100;
+	white-space: nowrap;
+	color: var(--text-normal);
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+	transform: translateX(-50%);
+}
+
+.time-tracker-heatmap-legend {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	margin: 8px 0 16px;
+	font-size: 11px;
+	color: var(--text-muted);
+}
+
+.time-tracker-heatmap-legend-label {
+	margin: 0 4px;
+}
+
+.time-tracker-heatmap-day-label {
+	font-size: 10px;
+	fill: var(--text-muted);
+	text-anchor: end;
+}
+
+.time-tracker-heatmap-month-label {
+	font-size: 10px;
+	fill: var(--text-muted);
+}
+
+/* Month calendar view */
+.time-tracker-month-title {
+	margin: 4px 0 12px;
+	font-size: 15px;
+	font-weight: 600;
+	color: var(--text-normal);
+	text-align: center;
+}
+
+.time-tracker-month-dow-label {
+	font-size: 11px;
+	font-weight: 500;
+	fill: var(--text-muted);
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+}
+
+.time-tracker-month-day-number {
+	font-size: 11px;
+	font-weight: 500;
+	fill: var(--text-muted);
+}
+
+.time-tracker-month-hours-label {
+	font-size: 11px;
+	font-weight: 600;
+	fill: var(--text-on-accent, var(--text-normal));
+	mix-blend-mode: difference;
+}
+
+.time-tracker-month-cell-group rect {
+	transition: filter 0.15s ease;
+}
+
+.time-tracker-month-cell-group:hover rect:not(.time-tracker-month-cell-future) {
+	filter: brightness(1.1);
+	cursor: pointer;
+}
+
+/* Accent color scheme heatmap levels */
+.time-tracker-heatmap-cell.level-0 { fill: var(--background-modifier-border); }
+.time-tracker-heatmap-cell.level-1 { fill: var(--interactive-accent); opacity: 0.25; }
+.time-tracker-heatmap-cell.level-2 { fill: var(--interactive-accent); opacity: 0.50; }
+.time-tracker-heatmap-cell.level-3 { fill: var(--interactive-accent); opacity: 0.75; }
+.time-tracker-heatmap-cell.level-4 { fill: var(--interactive-accent); opacity: 1.0; }
+.time-tracker-heatmap-cell.level-5 { fill: var(--color-red, #e93147); }
+
+/* ── Chart Modal ── */
+
+.time-tracker-chart-modal {
+	max-width: 640px;
+}
+
+.time-tracker-chart-section {
+	margin-bottom: 24px;
+}
+
+.time-tracker-chart-section h4 {
+	margin: 0 0 8px 0;
+	font-size: 14px;
+	font-weight: 600;
+	color: var(--text-normal);
+}
+
+.time-tracker-chart-canvas {
+	width: 100%;
+	height: 200px;
+}
+
+.time-tracker-chart-legend {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px 16px;
+	margin-top: 8px;
+	font-size: 12px;
+	color: var(--text-muted);
+}
+
+.time-tracker-chart-legend-item {
+	display: flex;
+	align-items: center;
+}
+
+.time-tracker-chart-legend-swatch {
+	display: inline-block;
+	width: 12px;
+	height: 12px;
+	border-radius: 2px;
+	margin-right: 4px;
+	flex-shrink: 0;
+}
+
+.time-tracker-chart-filter {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-bottom: 12px;
+	font-size: 12px;
+	color: var(--text-muted);
+}
+
+.time-tracker-chart-filter label {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	cursor: pointer;
+}
+
+/* ── View Toggle Buttons ── */
 
 .time-tracker-view-toggle {
 	display: flex;
@@ -232,14 +454,14 @@
 }
 
 .time-tracker-toggle-btn {
-	background: var(--background-secondary);
+	background: none;
 	border: 1px solid var(--background-modifier-border);
-	border-radius: 6px;
-	padding: 4px 16px;
+	border-radius: 4px;
+	padding: 4px 10px;
 	cursor: pointer;
 	color: var(--text-muted);
-	font-size: 13px;
-	transition: background 0.15s ease, color 0.15s ease;
+	font-size: 12px;
+	transition: all 0.15s ease;
 }
 
 .time-tracker-toggle-btn:hover {
@@ -254,15 +476,467 @@
 
 .time-tracker-toggle-active:hover {
 	background: var(--interactive-accent);
+}
+
+.time-tracker-loading {
+	color: var(--text-muted);
+	font-style: italic;
+}
+
+/* ── Holiday Manager Modal ── */
+
+.time-tracker-holiday-modal {
+	max-width: 520px;
+}
+
+.time-tracker-holiday-nav {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	margin-bottom: 16px;
+}
+
+.time-tracker-holiday-year {
+	font-size: 18px;
+	font-weight: 600;
+	color: var(--text-normal);
+}
+
+.time-tracker-holiday-count {
+	font-size: 12px;
+	color: var(--text-muted);
+	margin-left: auto;
+}
+
+.time-tracker-holiday-empty {
+	color: var(--text-muted);
+	font-style: italic;
+	margin: 8px 0;
+}
+
+.time-tracker-holiday-list {
+	margin-bottom: 16px;
+	max-height: 240px;
+	overflow-y: auto;
+}
+
+.time-tracker-holiday-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 4px 0;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.time-tracker-holiday-date {
+	font-size: 12px;
+	color: var(--text-muted);
+	font-family: monospace;
+	flex-shrink: 0;
+}
+
+.time-tracker-holiday-name {
+	font-size: 13px;
+	color: var(--text-normal);
+	flex: 1;
+}
+
+.time-tracker-holiday-delete {
+	background: none;
+	border: none;
+	color: var(--text-muted);
+	cursor: pointer;
+	font-size: 16px;
+	padding: 2px 6px;
+	border-radius: 3px;
+	flex-shrink: 0;
+}
+
+.time-tracker-holiday-delete:hover {
+	color: var(--color-red, #e93147);
+	background: var(--background-modifier-hover);
+}
+
+.time-tracker-holiday-add,
+.time-tracker-holiday-import {
+	margin-top: 12px;
+	padding-top: 12px;
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+.time-tracker-holiday-add h4,
+.time-tracker-holiday-import h4 {
+	margin: 0 0 8px 0;
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--text-normal);
+}
+
+.time-tracker-holiday-add-row {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+}
+
+.time-tracker-holiday-input {
+	padding: 4px 8px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	background: var(--background-primary);
+	color: var(--text-normal);
+	font-size: 13px;
+}
+
+.time-tracker-holiday-input[type="text"] {
+	flex: 1;
+}
+
+.time-tracker-holiday-textarea {
+	width: 100%;
+	min-height: 80px;
+	padding: 8px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	background: var(--background-primary);
+	color: var(--text-normal);
+	font-size: 12px;
+	font-family: monospace;
+	resize: vertical;
+	margin-bottom: 8px;
+}
+
+.time-tracker-holiday-import-actions {
+	display: flex;
+	gap: 8px;
+}
+
+/* ── Reference pill (BuJo Topic / JIRA) ── */
+
+.time-tracker-ref-pill {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 2px 8px;
+	border-radius: 10px;
+	background: var(--background-modifier-hover);
+	color: var(--text-muted);
+	font-size: 11px;
+	line-height: 1.4;
+	max-width: 320px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.time-tracker-ref-pill.time-tracker-ref-topic {
+	background: var(--color-purple, #7c3aed);
+	color: var(--text-on-accent, #fff);
+}
+
+.time-tracker-ref-pill.time-tracker-ref-jira {
+	background: var(--color-blue, #3182bd);
+	color: var(--text-on-accent, #fff);
+	font-family: var(--font-monospace, monospace);
+}
+
+.time-tracker-ref-pill.time-tracker-ref-empty {
+	background: transparent;
+	color: var(--text-faint);
+	padding: 0;
+}
+
+.time-tracker-ref-pill a.internal-link {
+	color: inherit;
+	text-decoration: none;
+}
+
+.time-tracker-ref-pill a.internal-link:hover {
+	text-decoration: underline;
+}
+
+.time-tracker-ref-status {
+	display: inline-block;
+	padding: 0 6px;
+	margin-left: 2px;
+	border-radius: 6px;
+	background: rgba(255, 255, 255, 0.2);
+	font-size: 10px;
+	text-transform: uppercase;
+	letter-spacing: 0.02em;
+}
+
+/* Inline reference cell inside summary rows */
+.time-tracker-ref-cell {
+	margin-left: 8px;
+	display: inline-flex;
+	align-items: center;
+}
+
+/* Reference-picker modal */
+.time-tracker-ref-picker-title {
+	padding: 10px 14px 4px;
+	font-weight: 600;
+	color: var(--text-normal);
+}
+
+.time-tracker-ref-picker-footer {
+	display: flex;
+	justify-content: flex-end;
+	padding: 8px 10px;
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+.time-tracker-ref-suggestion {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 6px 4px;
+}
+
+.time-tracker-ref-icon {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 18px;
+	height: 18px;
+	flex-shrink: 0;
+	color: var(--text-muted);
+}
+
+.time-tracker-ref-body {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	flex: 1;
+}
+
+.time-tracker-ref-title {
+	font-size: 13px;
+	color: var(--text-normal);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.time-tracker-ref-subtitle {
+	font-size: 11px;
+	color: var(--text-muted);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* ── Edit-log entry list ── */
+
+.time-tracker-entry-list {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	margin: 12px 0;
+	max-height: 60vh;
+	overflow-y: auto;
+}
+
+.time-tracker-log-row {
+	display: flex;
+	align-items: flex-start;
+	gap: 12px;
+	padding: 10px 12px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 8px;
+	background: var(--background-primary);
+	transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.time-tracker-log-row:hover {
+	background: var(--background-secondary);
+	border-color: var(--background-modifier-border-hover, var(--background-modifier-border));
+}
+
+.time-tracker-log-main {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.time-tracker-log-header {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	font-size: 12px;
+	color: var(--text-muted);
+}
+
+.time-tracker-log-time {
+	font-family: var(--font-monospace, monospace);
+}
+
+.time-tracker-log-duration {
+	padding: 1px 6px;
+	border-radius: 4px;
+	background: var(--background-secondary);
+	color: var(--text-normal);
+	font-weight: 600;
+	font-size: 11px;
+}
+
+.time-tracker-log-desc {
+	font-size: 13px;
+	line-height: 1.4;
+	color: var(--text-normal);
+	word-break: break-word;
+	overflow-wrap: anywhere;
+}
+
+.time-tracker-log-category {
+	color: var(--text-accent);
+	font-weight: 500;
+}
+
+.time-tracker-log-ref {
+	margin-top: 2px;
+}
+
+.time-tracker-log-ref .time-tracker-ref-pill {
+	max-width: 100%;
+}
+
+.time-tracker-log-actions {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	flex-shrink: 0;
+}
+
+.time-tracker-log-btn {
+	padding: 4px 12px;
+	font-size: 12px;
+	border-radius: 4px;
+	border: 1px solid var(--background-modifier-border);
+	background: var(--interactive-normal);
+	color: var(--text-normal);
+	cursor: pointer;
+	transition: background 0.15s ease;
+}
+
+.time-tracker-log-btn:hover {
+	background: var(--interactive-hover);
+}
+
+.time-tracker-log-btn.mod-warning {
+	color: var(--text-error, var(--color-red, #e93147));
+}
+
+.time-tracker-log-btn.mod-warning:hover {
+	background: var(--background-modifier-error-hover, var(--interactive-hover));
+}
+
+.time-tracker-no-entries {
+	color: var(--text-muted);
+	font-style: italic;
+	margin: 16px 0;
+	text-align: center;
+}
+
+/* Reference display inside form modals */
+.time-tracker-ref-display {
+	display: inline-block;
+	padding: 2px 8px;
+	margin-right: 8px;
+	border-radius: 8px;
+	background: var(--background-secondary);
+	color: var(--text-normal);
+	font-size: 12px;
+	max-width: 240px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.time-tracker-ref-display.time-tracker-ref-empty {
+	color: var(--text-faint);
+	font-style: italic;
+	background: transparent;
+	padding: 0;
+}
+
+/* ── Week-over-week delta chips ── */
+
+.time-tracker-card-delta {
+	margin-top: 2px;
+	font-size: 11px;
+	font-weight: 500;
+}
+
+.time-tracker-delta {
+	margin-left: 6px;
+	font-size: 10px;
+	font-weight: 500;
 	opacity: 0.9;
 }
 
-/* ── Entry Description in Daily Summary ── */
-
-.time-tracker-entry-desc {
-	font-size: 12px;
-	color: var(--text-normal);
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
+/* up = more hours vs last week → positive signal when goal-tracking. */
+.time-tracker-delta-up {
+	color: var(--color-green, #2f9e44);
 }
+
+.time-tracker-delta-down {
+	color: var(--color-orange, #f08c00);
+}
+
+.time-tracker-delta-flat {
+	color: var(--text-muted);
+}
+
+/* ── Unaccounted-time gaps ── */
+
+.time-tracker-gaps-section {
+	margin-top: 16px;
+	padding: 12px;
+	border-radius: 6px;
+	background: var(--background-secondary);
+	border-left: 3px solid var(--color-orange, #f08c00);
+}
+
+.time-tracker-gaps-section h4 {
+	margin: 0 0 8px;
+	font-size: 13px;
+	color: var(--text-normal);
+}
+
+.time-tracker-gap-row {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 4px 0;
+	font-size: 12px;
+}
+
+.time-tracker-gap-range {
+	font-family: var(--font-monospace, monospace);
+	color: var(--text-normal);
+	min-width: 100px;
+}
+
+.time-tracker-gap-duration {
+	color: var(--text-muted);
+	flex: 1;
+}
+
+.time-tracker-gap-log-btn {
+	padding: 2px 10px;
+	font-size: 11px;
+	border-radius: 4px;
+	background: var(--interactive-normal);
+	color: var(--text-normal);
+	border: none;
+	cursor: pointer;
+}
+
+.time-tracker-gap-log-btn:hover {
+	background: var(--interactive-hover);
+}
+
+

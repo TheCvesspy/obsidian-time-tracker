@@ -1,4 +1,4 @@
-import { Notice } from 'obsidian';
+import { notify } from '../utils';
 import { PluginSettings, ReminderMode } from '../types';
 import { TimerService } from './TimerService';
 
@@ -37,7 +37,7 @@ export class ReminderService {
 			// Only nudge when the timer is NOT running
 			if (!this.timerService.isRunning) {
 				const msg = this.getSettings().idleReminderMessage;
-				new Notice(msg, 10_000);
+				notify(msg, 'info', 10_000);
 			}
 		}, ms);
 	}
@@ -122,13 +122,16 @@ export class ReminderService {
 
 	private notifyActive(): void {
 		if (!this.timerService.isRunning) return;
+		// Suppress active reminders while the timer is paused — the user has
+		// explicitly stepped away, nudging them would be noise.
+		if (this.timerService.isPaused) return;
 
 		const elapsed = this.timerService.getFormattedElapsed();
 		const task = this.timerService.currentDescription || 'unnamed task';
 		const msg = this.getSettings().reminderMessage
 			.replace('{elapsed}', elapsed)
 			.replace('{task}', task);
-		new Notice(msg, 10_000);
+		notify(msg, 'info', 10_000);
 	}
 
 	private parseTimeToday(timeStr: string): Date | null {

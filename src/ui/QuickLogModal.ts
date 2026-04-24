@@ -1,7 +1,9 @@
 import { Modal, Setting, TextComponent } from 'obsidian';
 import type TimeTrackerPlugin from '../main';
-import { TimeEntry } from '../types';
+import { TimeEntry, WorklogReference } from '../types';
 import { addCategorySuggest } from './CategorySuggest';
+import { ReferenceSuggestModal } from './ReferenceSuggestModal';
+import { formatReferenceForDisplay } from './formatReference';
 import { formatDateISO } from '../utils';
 
 export class QuickLogModal extends Modal {
@@ -10,21 +12,33 @@ export class QuickLogModal extends Modal {
 	private endTime = '';
 	private description = '';
 	private category = '';
+	private reference: WorklogReference | null = null;
 	private durationEl: HTMLElement | null = null;
+	private referenceDisplayEl: HTMLElement | null = null;
 
-	constructor(private plugin: TimeTrackerPlugin) {
+	constructor(
+		private plugin: TimeTrackerPlugin,
+		prefill?: { date?: string; startTime?: string; endTime?: string; description?: string; category?: string }
+	) {
 		super(plugin.app);
 		// Default date to today
 		const now = new Date();
-		this.date = formatDateISO(now);
+		this.date = prefill?.date ?? formatDateISO(now);
 		// Default start time to current hour
-		this.startTime = `${String(now.getHours()).padStart(2, '0')}:00`;
+		this.startTime = prefill?.startTime ?? `${String(now.getHours()).padStart(2, '0')}:00`;
+		if (prefill?.endTime) this.endTime = prefill.endTime;
+		if (prefill?.description) this.description = prefill.description;
+		if (prefill?.category) this.category = prefill.category;
+		// Pre-seed with the last-used reference when enabled.
+		if (plugin.settings.rememberLastReference) {
+			this.reference = plugin.lastUsedReference ?? null;
+		}
 	}
 
 	onOpen(): void {
 		const { contentEl } = this;
 		contentEl.addClass('time-tracker-modal');
-		contentEl.createEl('h3', { text: 'Log Time' });
+		contentEl.createEl('h3', { text: 'Log Work' });
 
 		new Setting(contentEl)
 			.setName('Date')
@@ -50,7 +64,8 @@ export class QuickLogModal extends Modal {
 		new Setting(contentEl)
 			.setName('End time')
 			.addText(text => {
-				text.setPlaceholder('HH:MM')
+				text.setValue(this.endTime)
+					.setPlaceholder('HH:MM')
 					.onChange(val => {
 						this.endTime = val;
 						this.updateDuration();
@@ -72,7 +87,8 @@ export class QuickLogModal extends Modal {
 			.setName('Description')
 			.addText(text => {
 				descInput = text;
-				text.setPlaceholder('What did you work on?')
+				text.setValue(this.description)
+					.setPlaceholder('What did you work on?')
 					.onChange(val => { this.description = val; });
 				text.inputEl.addEventListener('keydown', (e: KeyboardEvent) => {
 					if (e.key === 'Enter') {
@@ -85,10 +101,34 @@ export class QuickLogModal extends Modal {
 		new Setting(contentEl)
 			.setName('Category')
 			.addText(text => {
-				text.setPlaceholder('Category (optional)')
+				text.setValue(this.category)
+					.setPlaceholder('Category (optional)')
 					.onChange(val => { this.category = val; });
 				addCategorySuggest(text, this.plugin.settings.categories, 'time-tracker-cat-quick');
 			});
+
+		// Reference field — only exposed when BuJo bridge is available.
+		if (this.plugin.bujoBridge.isAvailable()) {
+			const refSetting = new Setting(contentEl)
+				.setName('Reference')
+				.setDesc('Optional Topic or JIRA ticket.');
+			this.referenceDisplayEl = refSetting.controlEl.createSpan({
+				cls: 'time-tracker-ref-display',
+			});
+			this.renderReferenceDisplay();
+
+			refSetting.addButton(btn => {
+				btn.setButtonText('Pick…')
+					.onClick(() => this.openReferencePicker());
+			});
+			refSetting.addButton(btn => {
+				btn.setButtonText('Clear')
+					.onClick(() => {
+						this.reference = null;
+						this.renderReferenceDisplay();
+					});
+			});
+		}
 
 		new Setting(contentEl)
 			.addButton(btn => {
@@ -102,6 +142,32 @@ export class QuickLogModal extends Modal {
 
 	onClose(): void {
 		this.contentEl.empty();
+	}
+
+	private openReferencePicker(): void {
+		new ReferenceSuggestModal(
+			this.app,
+			this.plugin.bujoBridge,
+			(ref) => {
+				this.reference = ref;
+				this.renderReferenceDisplay();
+			},
+			{ initial: this.reference, title: 'Attach a reference' }
+		).open();
+	}
+
+	private renderReferenceDisplay(): void {
+		if (!this.referenceDisplayEl) return;
+		this.referenceDisplayEl.empty();
+		const formatted = formatReferenceForDisplay(this.reference ?? undefined, this.plugin.bujoBridge);
+		if (!formatted) {
+			this.referenceDisplayEl.addClass('time-tracker-ref-empty');
+			this.referenceDisplayEl.setText('none');
+			return;
+		}
+		this.referenceDisplayEl.removeClass('time-tracker-ref-empty');
+		this.referenceDisplayEl.setText(formatted.label);
+		if (formatted.tooltip) this.referenceDisplayEl.setAttr('title', formatted.tooltip);
 	}
 
 	private updateDuration(): void {
@@ -146,9 +212,13 @@ export class QuickLogModal extends Modal {
 			durationHours: Math.round(durationHours * 100) / 100,
 			description: this.description.trim(),
 			category: this.category.trim() || null,
+			...(this.reference ? { reference: this.reference } : {}),
 		};
 
 		this.close();
+		if (this.reference && this.plugin.settings.rememberLastReference) {
+			this.plugin.lastUsedReference = this.reference;
+		}
 		this.plugin.addManualEntry(entry);
 	}
 

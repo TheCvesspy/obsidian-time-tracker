@@ -1,9 +1,9 @@
 {
 	"id": "obsidian-time-tracker",
 	"name": "Time Tracker",
-	"version": "1.0.0",
+	"version": "1.3.0",
 	"minAppVersion": "1.0.0",
 	"description": "Track time spent on tasks with timer, reminders, and reports. Integrates with BuJo daily notes.",
-	"author": "Time Tracker",
+	"author": "Quill of the Weavers",
 	"isDesktopOnly": false
 }

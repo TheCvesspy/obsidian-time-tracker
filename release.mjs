@@ -40,3 +40,20 @@ for (const file of files) {
 }
 
 console.log(`\nRelease ready in _release/`);
+
+// Deploy to Obsidian vault
+const vaultPluginDir = 'C:/Users/on079542/Obsidian Vaults/QuillWork/.obsidian/plugins/obsidian-time-tracker';
+if (existsSync(vaultPluginDir)) {
+	console.log(`\nDeploying to ${vaultPluginDir}`);
+	for (const file of files) {
+		const src = join(__dirname, file);
+		const dst = join(vaultPluginDir, file);
+		if (existsSync(src)) {
+			copyFileSync(src, dst);
+			console.log(`  ${file}`);
+		}
+	}
+	console.log('Deployed. Reload the plugin in Obsidian.');
+} else {
+	console.warn(`\nVault plugin dir not found: ${vaultPluginDir}`);
+}

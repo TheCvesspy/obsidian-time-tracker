@@ -1,6 +1,7 @@
 import { App, PluginSettingTab, Setting } from 'obsidian';
 import type TimeTrackerPlugin from './main';
-import { ReminderMode } from './types';
+import { ReminderMode, HeatmapColorScheme } from './types';
+import { HolidayManagerModal } from './ui/HolidayManagerModal';
 
 export class TimeTrackerSettingTab extends PluginSettingTab {
 	constructor(app: App, private plugin: TimeTrackerPlugin) {
@@ -38,18 +39,72 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 							await this.plugin.saveSettings();
 						});
 				});
-		}
 
-		new Setting(containerEl)
-			.setName('Integrate with Obsidian Daily Notes')
-			.setDesc('When enabled and Obsidian Daily Notes core plugin is active, time logs are added to its daily notes. Lower priority than BuJo.')
-			.addToggle(toggle => {
-				toggle.setValue(this.plugin.settings.enableObsidianDailyNotesIntegration)
-					.onChange(async val => {
-						this.plugin.settings.enableObsidianDailyNotesIntegration = val;
-						await this.plugin.saveSettings();
-					});
+			// ── Reference picker sub-section (only when BuJo integration is enabled) ──
+			const bujoAvailable = this.plugin.bujoBridge.isAvailable();
+			const jiraEnabled = this.plugin.bujoBridge.isJiraEnabled();
+
+			containerEl.createEl('h4', {
+				text: 'Topic / JIRA References',
+				cls: 'time-tracker-settings-subheading',
 			});
+			const statusLine = containerEl.createEl('p', { cls: 'setting-item-description' });
+			statusLine.setText(
+				bujoAvailable
+					? (jiraEnabled
+						? 'BuJo detected. JIRA enrichment available.'
+						: 'BuJo detected. JIRA enrichment is disabled in BuJo settings — Topics will still work.')
+					: 'BuJo plugin not detected. These options take effect once BuJo is active.'
+			);
+
+			new Setting(containerEl)
+				.setName('Prompt for reference when starting timer')
+				.setDesc('Open the picker before the timer starts. A dedicated command that always prompts is also available.')
+				.addToggle(toggle => {
+					toggle.setValue(this.plugin.settings.bujoPromptOnStart)
+						.setDisabled(!bujoAvailable)
+						.onChange(async val => {
+							this.plugin.settings.bujoPromptOnStart = val;
+							await this.plugin.saveSettings();
+						});
+				});
+
+			new Setting(containerEl)
+				.setName('Prompt for reference when stopping timer')
+				.setDesc('If the running timer has no reference yet, open a skippable picker before writing the log.')
+				.addToggle(toggle => {
+					toggle.setValue(this.plugin.settings.bujoPromptOnStop)
+						.setDisabled(!bujoAvailable)
+						.onChange(async val => {
+							this.plugin.settings.bujoPromptOnStop = val;
+							await this.plugin.saveSettings();
+						});
+				});
+
+			new Setting(containerEl)
+				.setName('Enrich JIRA keys in reports')
+				.setDesc('Fetch issue title and status from JIRA via BuJo and show them next to the key. Markdown stores only the raw key.')
+				.addToggle(toggle => {
+					toggle.setValue(this.plugin.settings.enableJiraEnrichment)
+						.setDisabled(!bujoAvailable)
+						.onChange(async val => {
+							this.plugin.settings.enableJiraEnrichment = val;
+							await this.plugin.saveSettings();
+						});
+				});
+
+			new Setting(containerEl)
+				.setName('Remember last-used reference')
+				.setDesc('Pre-seed the picker with the most recently chosen Topic/JIRA.')
+				.addToggle(toggle => {
+					toggle.setValue(this.plugin.settings.rememberLastReference)
+						.setDisabled(!bujoAvailable)
+						.onChange(async val => {
+							this.plugin.settings.rememberLastReference = val;
+							await this.plugin.saveSettings();
+						});
+				});
+		}
 
 		new Setting(containerEl)
 			.setName('Standalone daily note path')
@@ -293,6 +348,179 @@ export class TimeTrackerSettingTab extends PluginSettingTab {
 						this.plugin.settings.weekStartDay = parseInt(val);
 						await this.plugin.saveSettings();
 					});
+			});
+
+		// ── Work Days & Holidays ──
+		containerEl.createEl('h3', { text: 'Work Days & Holidays' });
+
+		new Setting(containerEl)
+			.setName('Exclude non-working days from statistics')
+			.setDesc('Weekends and holidays won\'t break streaks or affect averages in reports.')
+			.addToggle(toggle => {
+				toggle.setValue(this.plugin.settings.excludeNonWorkingDays)
+					.onChange(async val => {
+						this.plugin.settings.excludeNonWorkingDays = val;
+						await this.plugin.saveSettings();
+					});
+			});
+
+		const holidayCount = this.plugin.settings.holidays.length;
+		const currentYear = new Date().getFullYear();
+		const thisYearCount = this.plugin.settings.holidays.filter(
+			h => h.date.startsWith(`${currentYear}-`)
+		).length;
+
+		new Setting(containerEl)
+			.setName('Manage holidays')
+			.setDesc(`${holidayCount} holiday${holidayCount !== 1 ? 's' : ''} configured (${thisYearCount} for ${currentYear}).`)
+			.addButton(btn => {
+				btn.setButtonText('Manage Holidays...')
+					.onClick(() => {
+						new HolidayManagerModal(this.plugin).open();
+					});
+			});
+
+		// ── Goals ──
+		containerEl.createEl('h3', { text: 'Goals' });
+
+		new Setting(containerEl)
+			.setName('Enable daily goals')
+			.setDesc('Track progress towards a daily time goal.')
+			.addToggle(toggle => {
+				toggle.setValue(this.plugin.settings.enableGoals)
+					.onChange(async val => {
+						this.plugin.settings.enableGoals = val;
+						await this.plugin.saveSettings();
+						this.display();
+					});
+			});
+
+		if (this.plugin.settings.enableGoals) {
+			new Setting(containerEl)
+				.setName('Daily goal (hours)')
+				.setDesc('Target number of hours per day.')
+				.addText(text => {
+					text.setValue(String(this.plugin.settings.dailyGoalHours))
+						.setPlaceholder('8')
+						.onChange(async val => {
+							const num = parseFloat(val);
+							if (!isNaN(num) && num > 0) {
+								this.plugin.settings.dailyGoalHours = num;
+								await this.plugin.saveSettings();
+							}
+						});
+					text.inputEl.type = 'number';
+					text.inputEl.min = '0.5';
+					text.inputEl.step = '0.5';
+					text.inputEl.style.width = '80px';
+				});
+		}
+
+		// ── Appearance ──
+		containerEl.createEl('h3', { text: 'Appearance' });
+
+		new Setting(containerEl)
+			.setName('Heatmap color scheme')
+			.setDesc('Color scheme for the calendar heatmap visualization.')
+			.addDropdown(dropdown => {
+				dropdown.addOption('green', 'Green')
+					.addOption('blue', 'Blue')
+					.addOption('purple', 'Purple')
+					.addOption('accent', 'Theme Accent')
+					.setValue(this.plugin.settings.heatmapColorScheme)
+					.onChange(async val => {
+						this.plugin.settings.heatmapColorScheme = val as HeatmapColorScheme;
+						await this.plugin.saveSettings();
+					});
+			});
+
+		// ── Safety nets ──
+		containerEl.createEl('h3', { text: 'Safety Nets' });
+
+		new Setting(containerEl)
+			.setName('Warn on overlapping entries')
+			.setDesc('Show a confirmation when a new or edited log overlaps an existing row on the same date.')
+			.addToggle(toggle => {
+				toggle.setValue(this.plugin.settings.warnOnOverlap)
+					.onChange(async val => {
+						this.plugin.settings.warnOnOverlap = val;
+						await this.plugin.saveSettings();
+					});
+			});
+
+		new Setting(containerEl)
+			.setName('Detect unlogged time gaps')
+			.setDesc('When starting a timer after a break, suggest logging the missed time. Also surfaces gaps in the Daily Summary.')
+			.addToggle(toggle => {
+				toggle.setValue(this.plugin.settings.enableGapDetection)
+					.onChange(async val => {
+						this.plugin.settings.enableGapDetection = val;
+						await this.plugin.saveSettings();
+						this.display();
+					});
+			});
+
+		if (this.plugin.settings.enableGapDetection) {
+			new Setting(containerEl)
+				.setName('Minimum gap (minutes)')
+				.setDesc('Gaps shorter than this are ignored. Avoids flagging normal 2–3 min context switches.')
+				.addText(text => {
+					text.setValue(String(this.plugin.settings.gapDetectionMinutes))
+						.setPlaceholder('15')
+						.onChange(async val => {
+							const n = parseInt(val);
+							if (!isNaN(n) && n > 0) {
+								this.plugin.settings.gapDetectionMinutes = n;
+								await this.plugin.saveSettings();
+							}
+						});
+					text.inputEl.type = 'number';
+					text.inputEl.min = '1';
+					text.inputEl.style.width = '80px';
+				});
+		}
+
+		// ── Time Rounding ──
+		containerEl.createEl('h3', { text: 'Time Rounding' });
+
+		new Setting(containerEl)
+			.setName('Rounding mode')
+			.setDesc('Round end times to the nearest interval when editing time logs.')
+			.addDropdown(dropdown => {
+				dropdown.addOption('none', 'None')
+					.addOption('5min', '5 minutes')
+					.addOption('15min', '15 minutes')
+					.addOption('30min', '30 minutes')
+					.setValue(this.plugin.settings.roundingMode)
+					.onChange(async val => {
+						this.plugin.settings.roundingMode = val;
+						await this.plugin.saveSettings();
+					});
+			});
+
+		// ── Template Tasks ──
+		containerEl.createEl('h3', { text: 'Template Tasks' });
+
+		new Setting(containerEl)
+			.setName('Quick-start templates')
+			.setDesc('JSON array of template tasks. Each: {"name":"Label","description":"Task","category":"Cat"}')
+			.addTextArea(text => {
+				text.setValue(JSON.stringify(this.plugin.settings.templateTasks, null, 2) || '[]')
+					.setPlaceholder('[{"name":"Standup","description":"Daily standup","category":"Meetings"}]')
+					.onChange(async val => {
+						try {
+							const parsed = JSON.parse(val);
+							if (Array.isArray(parsed)) {
+								this.plugin.settings.templateTasks = parsed;
+								await this.plugin.saveSettings();
+							}
+						} catch {
+							// Invalid JSON — ignore until valid
+						}
+					});
+				text.inputEl.rows = 5;
+				text.inputEl.style.width = '100%';
+				text.inputEl.style.fontFamily = 'monospace';
 			});
 	}
 }

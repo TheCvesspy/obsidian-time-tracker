@@ -1,4 +1,15 @@
-/** A single time tracking entry */
+/**
+ * Optional reference attached to a time log, linking it to a BuJo Topic
+ * or a single JIRA issue. Only set on new entries written after the
+ * BuJo integration was introduced — legacy rows parse with `reference = undefined`.
+ */
+export type WorklogReference =
+	/** Link to a BuJo Topic. `value` is the topic title (serialised as `[[value]]`). `topicPath` is kept in memory only. */
+	| { kind: 'topic'; value: string; topicPath?: string }
+	/** A single JIRA issue key, e.g. `PROJ-123` (always uppercase). */
+	| { kind: 'jira'; value: string };
+
+/** A single time log */
 export interface TimeEntry {
 	/** Unique ID for in-memory tracking: `${date}:${startTime}` */
 	id: string;
@@ -14,22 +25,26 @@ export interface TimeEntry {
 	description: string;
 	/** Category/project name (optional) */
 	category: string | null;
+	/** Optional link to a BuJo Topic or JIRA issue. Absent on legacy rows. */
+	reference?: WorklogReference;
 }
 
 /** Timer state persisted across restarts */
 export interface TimerState {
-	/** Whether the timer is currently running */
+	/** Timer has an active run (true when running OR paused; false only when stopped). */
 	isRunning: boolean;
-	/** Whether the timer is paused */
-	isPaused: boolean;
-	/** ISO timestamp when timer was started (or resumed), null if stopped */
+	/** ISO timestamp when timer was started, null if stopped */
 	startedAt: string | null;
-	/** Milliseconds accumulated before the current segment (from pauses) */
-	accumulatedMs: number;
 	/** Description of current task */
 	currentDescription: string;
 	/** Category of current task */
 	currentCategory: string | null;
+	/** Optional reference attached to the running timer; persisted via saveData */
+	currentReference?: WorklogReference;
+	/** ISO timestamp when the timer was paused. Null when the timer is running or stopped. */
+	pausedAt?: string | null;
+	/** Cumulative milliseconds accumulated from completed pauses during this run (resets on start/stop). */
+	accumulatedPausedMs?: number;
 }
 
 export enum ReminderMode {
@@ -43,8 +58,6 @@ export interface PluginSettings {
 	standaloneDailyNotePath: string;
 	/** Whether to integrate with BuJo plugin when available */
 	enableBuJoIntegration: boolean;
-	/** Whether to integrate with Obsidian's core Daily Notes plugin */
-	enableObsidianDailyNotesIntegration: boolean;
 	/** Manual override for BuJo daily note path (empty = auto-detect from BuJo settings) */
 	buJoDailyNotePathOverride: string;
 	/** Section heading to use in daily notes */
@@ -75,15 +88,42 @@ export interface PluginSettings {
 	weekStartDay: number;
 	/** Whether the status bar widget is enabled */
 	showStatusBar: boolean;
+	/** Whether daily goal tracking is enabled */
+	enableGoals: boolean;
+	/** Daily goal in hours */
+	dailyGoalHours: number;
+	/** Color scheme for the calendar heatmap */
+	heatmapColorScheme: HeatmapColorScheme;
+	/** Time rounding mode: 'none', '5min', '15min', '30min' */
+	roundingMode: string;
+	/** Predefined template tasks for quick start */
+	templateTasks: TemplateTask[];
+	/** List of non-working days (holidays) */
+	holidays: Holiday[];
+	/** Whether to exclude weekends/holidays from streak calculations and statistics */
+	excludeNonWorkingDays: boolean;
+	/** Prompt for a Topic/JIRA reference when starting the timer (only when BuJo is available) */
+	bujoPromptOnStart: boolean;
+	/** Prompt for a Topic/JIRA reference when stopping the timer if none is attached */
+	bujoPromptOnStop: boolean;
+	/** Fetch JIRA title/status from BuJo and show next to keys in reports */
+	enableJiraEnrichment: boolean;
+	/** Pre-seed the picker with the last-used reference */
+	rememberLastReference: boolean;
+	/** Warn with a confirmation modal when a new/edited entry overlaps existing rows on the same date */
+	warnOnOverlap: boolean;
+	/** Minimum gap in minutes before the gap-detection nudge is shown */
+	gapDetectionMinutes: number;
+	/** Whether to show a nudge when starting a timer after a gap */
+	enableGapDetection: boolean;
 }
 
 export const DEFAULT_SETTINGS: PluginSettings = {
 	standaloneDailyNotePath: 'TimeTracking/Daily',
 	enableBuJoIntegration: true,
-	enableObsidianDailyNotesIntegration: true,
 	buJoDailyNotePathOverride: '',
 	timeLogHeading: '## Time Log',
-	categories: ['Deep Work', 'Meetings', 'Admin', 'Review', 'Learning'],
+	categories: ['Meetings', 'Ceremonies', 'Analysis', 'Research', 'Testing', 'Review', 'Management', 'Admin', 'Learning'],
 	allowFreeTextCategories: true,
 	reminderMode: ReminderMode.Off,
 	reminderIntervalMinutes: 30,
@@ -96,6 +136,20 @@ export const DEFAULT_SETTINGS: PluginSettings = {
 	timeFormat: '24h',
 	weekStartDay: 1,
 	showStatusBar: true,
+	enableGoals: false,
+	dailyGoalHours: 8,
+	heatmapColorScheme: 'green' as HeatmapColorScheme,
+	roundingMode: 'none',
+	templateTasks: [],
+	holidays: [],
+	excludeNonWorkingDays: true,
+	bujoPromptOnStart: false,
+	bujoPromptOnStop: true,
+	enableJiraEnrichment: true,
+	rememberLastReference: true,
+	warnOnOverlap: true,
+	gapDetectionMinutes: 15,
+	enableGapDetection: true,
 };
 
 export interface PluginData {
@@ -108,11 +162,11 @@ export const DEFAULT_PLUGIN_DATA: PluginData = {
 	settings: { ...DEFAULT_SETTINGS },
 	timerState: {
 		isRunning: false,
-		isPaused: false,
 		startedAt: null,
-		accumulatedMs: 0,
 		currentDescription: '',
 		currentCategory: null,
+		pausedAt: null,
+		accumulatedPausedMs: 0,
 	},
 };
 
@@ -132,10 +186,45 @@ export interface WeeklySummary {
 	byCategory: Record<string, number>;
 }
 
-export interface MonthlySummary {
-	/** "YYYY-MM" */
-	month: string;
+export interface TemplateTask {
+	name: string;
+	description: string;
+	category: string;
+}
+
+/** A non-working day (national holiday, company day off, etc.) */
+export interface Holiday {
+	/** ISO date string YYYY-MM-DD */
+	date: string;
+	/** Display name (e.g., "Christmas Day") */
+	name: string;
+}
+
+export interface DateRangeSummary {
+	startDate: string;
+	endDate: string;
 	days: DailySummary[];
 	totalHours: number;
 	byCategory: Record<string, number>;
 }
+
+export type HeatmapColorScheme = 'green' | 'blue' | 'purple' | 'accent';
+
+export const HEATMAP_COLOR_SCHEMES: Record<HeatmapColorScheme, { colors: string[]; overtime: string }> = {
+	green: {
+		colors: ['#9be9a8', '#40c463', '#30a14e', '#216e39'],
+		overtime: '#ff6b6b',
+	},
+	blue: {
+		colors: ['#9ecae1', '#6baed6', '#3182bd', '#08519c'],
+		overtime: '#ff6b6b',
+	},
+	purple: {
+		colors: ['#c9b1ff', '#9f7aea', '#7c3aed', '#5b21b6'],
+		overtime: '#ff6b6b',
+	},
+	accent: {
+		colors: [],
+		overtime: '',
+	},
+};

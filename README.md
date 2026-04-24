@@ -1,30 +1,22 @@
 # Time Tracker for Obsidian
 
-A time tracking plugin for Obsidian that helps you stay on top of your hours. Start a timer, pause and resume, get nudged when you forget, quickly log time, and review your day, week, or month — all from within Obsidian.
+A time tracking plugin for Obsidian that helps you stay on top of your hours. Start a timer, get nudged when you forget, quickly log time, and review your work with rich reports — all from within Obsidian.
 
 ## Features
 
 ### Status Bar Timer
-A compact timer lives in your status bar. When running, it shows elapsed time and current task with a pulsing green indicator. When idle, it shows today's total tracked hours. Click for actions: start, pause, resume, or stop.
-
-### Timer Pause/Resume
-Need a break? Pause the timer instead of stopping it. The elapsed time freezes, and you can resume when ready. The status bar shows a yellow indicator and pause icon while paused. Toggle Timer cycles through: idle → start, running → pause, paused → resume.
+A compact timer lives in your status bar. When running, it shows elapsed time and current task with a pulsing green indicator. When idle, it shows today's total logged hours — and when daily goals are enabled, it shows progress toward your goal (e.g., `5.5h / 8h`) with color indicators: muted when far, yellow when close (75%+), green when reached. Click for a context menu with quick actions: start/stop timer, daily summary, edit logs, heatmap, and trend charts.
 
 ### Quick Logging
 Two ways to capture time:
-- **Timer mode** — start a timer, work, stop it. Log is saved automatically.
-- **Log Time** — manually log a past time log with start time, end time, and description.
+- **Timer mode** — start a timer, work, stop it. Time log is saved automatically.
+- **Manual mode** — quickly log a past time block with start time, end time, and description.
 
 ### Edit & Delete Logs
-Made a mistake? Use the **Edit Time Log** command to browse logs by date, then edit any field (times, description, category) or delete a log entirely. Changes are written directly to the markdown table with the total recalculated automatically.
+Open the Edit Time Log modal to view, modify, or delete any existing time log for any date. Changes are written back to the daily note markdown.
 
-### Midnight Crossing
-If a timer runs past midnight, it's automatically split into two logs — one for each day. Daily totals stay accurate.
-
-### Daily & Weekly Summaries
-- **Daily Summary** — see today's (or any day's) total hours, log list, and category breakdown with bar chart visualization. Navigate between days.
-- **Weekly Summary** — total hours per day, category breakdown, average per day. Copy as markdown or insert directly into a note. Navigate between weeks.
-- **Monthly Summary** — toggle to monthly view in the Weekly Summary modal for a full month overview with the same visualizations and export options.
+### Daily Summary
+View a summary of today's tracked time — total hours, per-log breakdown, and category split. When daily goals are enabled, a progress bar shows how close you are to your target.
 
 ### Idle Nudges
 The plugin reminds you to track your time when no timer is running. Configurable interval (default: every 30 minutes). Because the whole point is to not forget.
@@ -33,17 +25,50 @@ The plugin reminds you to track your time when no timer is running. Configurable
 Optional notifications while a timer is running — either at regular intervals or at specific scheduled times throughout the day.
 
 ### Categories
-Define project categories (e.g., "Deep Work", "Meetings", "Admin") that appear as autocomplete suggestions when logging time. Free-text input is also supported. New categories you type are automatically learned and added to the suggestion list.
+Define project categories that appear as autocomplete suggestions when logging time. Default categories are tailored for analyst/management roles: Meetings, Ceremonies, Analysis, Research, Testing, Review, Management, Admin, and Learning. Free-text entry is also supported — customize the list in settings to match your workflow.
 
-### Daily Notes Integration
-The plugin detects your daily note setup with this priority:
-1. **BuJo Task Manager** — if installed and enabled, logs go into BuJo daily notes
-2. **Obsidian Daily Notes** — if the core Daily Notes plugin is enabled, logs go there (respects your folder and date format settings)
-3. **Standalone** — creates its own daily notes at a configurable path
+### Weekly Summary
+A built-in report showing:
+- Total hours per day with bar chart visualization
+- Category breakdown with percentages
+- Copy as markdown or insert directly into a note
+
+### Date Range Reports
+Generate reports for custom date ranges with preset buttons for last 7 days, 30 days, and quarterly periods. Shows daily breakdown, category split, and active day count. Copy or insert as markdown.
+
+### Calendar Heatmap
+A GitHub-style activity heatmap showing your time tracking activity over 3 months, 6 months, or a full year. Includes stats for total hours, average per work day, current streak, longest streak, and most productive day of the week. Weekends and holidays are visually distinguished with a diagonal stripe pattern. Configurable color schemes (green, blue, purple, or theme accent).
+
+When "Exclude non-working days" is enabled, streaks skip weekends and holidays — a Friday-to-Monday streak isn't broken by a weekend off.
+
+### Trend Charts
+Two chart views for visualizing patterns:
+- **Hours over time** — line chart of daily hours with optional goal line and a 5-day moving average for spotting trends. Toggle "Workdays only" to remove weekend dips; when showing all days, weekends are shaded for context.
+- **Category trends** — weekly stacked area chart showing how your time splits across categories
+
+### Template Tasks
+Pre-configure common tasks (with name, description, and category) for one-click timer start. Ideal for recurring activities like standups, deep work blocks, or admin time.
+
+### Daily Goals
+Set a target number of hours per day. When enabled, the status bar shows goal progress with color indicators, the daily summary shows a progress bar, and the calendar heatmap uses goal-relative scaling with overtime indication.
+
+### Work Days & Holidays
+Designed for work time tracking (Mon–Fri). When "Exclude non-working days" is enabled:
+- Weekends and holidays don't break streaks
+- Averages are computed over work days only
+- Trend charts can filter to workdays only
+
+Manage holidays via a dedicated modal with year-based navigation. Add holidays individually or bulk-import by pasting a list (one per line, format: `YYYY-MM-DD Holiday Name`). Holiday data persists across years for accurate long-term trends.
+
+### Time Rounding
+Optionally round end times to the nearest 5, 15, or 30 minutes when editing time logs.
+
+### BuJo Integration
+If the [BuJo Task Manager](https://github.com/) plugin is installed, time logs are added to BuJo's daily notes under a `## Time Log` section. If BuJo isn't present, the plugin creates its own daily notes.
 
 ## Time Log Format
 
-Logs are stored as standard markdown tables in daily notes:
+Time logs are stored as standard markdown tables in daily notes:
 
 ```markdown
 ## Time Log
@@ -62,15 +87,17 @@ Everything stays in plain markdown. No proprietary formats, no lock-in.
 | Command | Description |
 |---------|-------------|
 | **Start Timer** | Open modal to start tracking a task |
-| **Stop Timer** | Stop the running timer and save the log |
-| **Pause Timer** | Pause the running timer (preserves elapsed time) |
-| **Resume Timer** | Resume a paused timer |
-| **Toggle Timer** | Cycle: idle → start, running → pause, paused → resume |
-| **Log Time** | Manually log a past time log |
-| **Edit Time Log** | Edit or delete logs for any date |
-| **Daily Summary** | View today's summary with navigation |
-| **Weekly Summary** | Open the weekly/monthly report modal |
+| **Stop Timer** | Stop the running timer and save the time log |
+| **Toggle Timer** | Start or stop — ideal for a keyboard shortcut |
+| **Quick Log** | Manually log a past time block |
+| **Weekly Summary** | Open the weekly report modal |
 | **Open Today's Time Log** | Navigate to today's daily note |
+| **Daily Summary** | View today's summary with goal progress |
+| **Edit Time Log** | Edit or delete existing time logs |
+| **Date Range Report** | Generate report for a custom date range |
+| **Calendar Heatmap** | View GitHub-style activity heatmap |
+| **Trend Charts** | View hours and category trend charts |
+| **Start Timer from Template** | Quick-start timer from a saved template |
 
 All commands are available from the command palette (`Ctrl/Cmd + P`). You can assign keyboard shortcuts in Obsidian's Hotkeys settings.
 
@@ -79,12 +106,11 @@ All commands are available from the command palette (`Ctrl/Cmd + P`). You can as
 ### Integration
 - **BuJo integration** — toggle on/off; auto-detects BuJo's daily note path
 - **BuJo path override** — manually set the path if auto-detect doesn't work
-- **Obsidian Daily Notes integration** — toggle on/off; auto-detects folder and date format from the core plugin
-- **Standalone daily note path** — where to store notes when neither integration is active (default: `TimeTracking/Daily`)
+- **Standalone daily note path** — where to store notes when BuJo isn't present (default: `TimeTracking/Daily`)
 - **Time log section heading** — customize the markdown heading (default: `## Time Log`)
 
 ### Categories
-- **Project categories** — comma-separated list of category suggestions (auto-learns new categories)
+- **Project categories** — comma-separated list of category suggestions (default: Meetings, Ceremonies, Analysis, Research, Testing, Review, Management, Admin, Learning)
 - **Allow free-text** — type any category, not just predefined ones
 
 ### Timer Display
@@ -98,6 +124,23 @@ All commands are available from the command palette (`Ctrl/Cmd + P`). You can as
 
 ### Reports
 - **Week start day** — Sunday through Saturday
+
+### Work Days & Holidays
+- **Exclude non-working days** — weekends/holidays won't break streaks or affect averages
+- **Manage Holidays** — opens a modal to add, import, or remove holidays by year
+
+### Goals
+- **Enable daily goals** — toggle goal tracking on/off
+- **Daily goal (hours)** — target number of hours per day (default: 8)
+
+### Appearance
+- **Heatmap color scheme** — green, blue, purple, or theme accent
+
+### Time Rounding
+- **Rounding mode** — none, 5 minutes, 15 minutes, or 30 minutes
+
+### Template Tasks
+- **Quick-start templates** — JSON array of template tasks, each with name, description, and category
 
 ## Installation
 
@@ -132,10 +175,11 @@ src/
   main.ts           — Plugin entry point
   types.ts          — TypeScript interfaces and defaults
   constants.ts      — Regex patterns, table templates
-  settings.ts       — Settings UI
+  settings.ts       — Settings UI (10 sections)
   utils.ts          — Shared date/time utilities
   services/         — Core business logic
   ui/               — Modal and widget components
+    charts/         — Heatmap and chart renderers
 ```
 
 See [agents.md](agents.md) for detailed architecture documentation.
@@ -143,9 +187,9 @@ See [agents.md](agents.md) for detailed architecture documentation.
 ## Design Principles
 
 - **Everything in markdown** — no binary state, no database. All time logs are readable, editable, and portable.
-- **Configurable over hardcoded** — sensible defaults, but nothing is locked in.
+- **Configurable over hardcoded** — 22 settings covering every behavior. Sensible defaults, but nothing is locked in.
 - **Non-destructive** — only writes within the `## Time Log` section. Never touches your other content. Safe to uninstall at any time.
-- **Integration-aware** — detects BuJo and Obsidian Daily Notes automatically, works standalone when neither is present.
+- **BuJo-aware** — integrates with the BuJo Task Manager when present, works standalone when not.
 
 ## License
 

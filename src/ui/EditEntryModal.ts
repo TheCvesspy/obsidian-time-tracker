@@ -1,8 +1,10 @@
-import { Modal, Notice, Setting, TextComponent } from 'obsidian';
+import { Modal, Setting, TextComponent } from 'obsidian';
 import type TimeTrackerPlugin from '../main';
-import { TimeEntry } from '../types';
+import { TimeEntry, WorklogReference } from '../types';
 import { addCategorySuggest } from './CategorySuggest';
-import { formatDateISO } from '../utils';
+import { ReferenceSuggestModal } from './ReferenceSuggestModal';
+import { formatReferenceForDisplay, renderReferencePill } from './formatReference';
+import { formatDateISO, roundEndTime, notify } from '../utils';
 
 /**
  * Two-phase modal:
@@ -19,7 +21,9 @@ export class EditEntryModal extends Modal {
 	private endTime = '';
 	private description = '';
 	private category = '';
+	private reference: WorklogReference | null = null;
 	private durationEl: HTMLElement | null = null;
+	private referenceDisplayEl: HTMLElement | null = null;
 
 	constructor(private plugin: TimeTrackerPlugin) {
 		super(plugin.app);
@@ -78,21 +82,44 @@ export class EditEntryModal extends Modal {
 		const listEl = contentEl.createDiv({ cls: 'time-tracker-entry-list' });
 
 		for (const entry of this.entries) {
-			const label = entry.category
-				? `${entry.startTime} - ${entry.endTime}  |  ${entry.durationHours}h  |  ${entry.category} - ${entry.description}`
-				: `${entry.startTime} - ${entry.endTime}  |  ${entry.durationHours}h  |  ${entry.description}`;
+			const row = listEl.createDiv({ cls: 'time-tracker-log-row' });
 
-			new Setting(listEl)
-				.setName(label)
-				.addButton(btn => {
-					btn.setButtonText('Edit')
-						.onClick(() => this.showEditForm(entry));
-				})
-				.addButton(btn => {
-					btn.setButtonText('Delete')
-						.setWarning()
-						.onClick(() => this.confirmDelete(entry));
-				});
+			const main = row.createDiv({ cls: 'time-tracker-log-main' });
+
+			const header = main.createDiv({ cls: 'time-tracker-log-header' });
+			header.createSpan({
+				cls: 'time-tracker-log-time',
+				text: `${entry.startTime} – ${entry.endTime}`,
+			});
+			header.createSpan({
+				cls: 'time-tracker-log-duration',
+				text: `${entry.durationHours}h`,
+			});
+
+			const desc = main.createDiv({ cls: 'time-tracker-log-desc' });
+			if (entry.category) {
+				desc.createSpan({ cls: 'time-tracker-log-category', text: entry.category });
+				desc.appendText(' · ');
+			}
+			desc.appendText(entry.description);
+
+			if (entry.reference) {
+				const refWrap = main.createDiv({ cls: 'time-tracker-log-ref' });
+				renderReferencePill(refWrap, entry.reference, this.plugin.bujoBridge, this.app);
+			}
+
+			const actions = row.createDiv({ cls: 'time-tracker-log-actions' });
+			const editBtn = actions.createEl('button', {
+				text: 'Edit',
+				cls: 'time-tracker-log-btn',
+			});
+			editBtn.addEventListener('click', () => this.showEditForm(entry));
+
+			const deleteBtn = actions.createEl('button', {
+				text: 'Delete',
+				cls: 'time-tracker-log-btn mod-warning',
+			});
+			deleteBtn.addEventListener('click', () => this.confirmDelete(entry));
 		}
 	}
 
@@ -102,6 +129,7 @@ export class EditEntryModal extends Modal {
 		this.endTime = entry.endTime ?? '';
 		this.description = entry.description;
 		this.category = entry.category ?? '';
+		this.reference = entry.reference ?? null;
 
 		const { contentEl } = this;
 		contentEl.empty();
@@ -165,6 +193,32 @@ export class EditEntryModal extends Modal {
 				addCategorySuggest(text, this.plugin.settings.categories, 'time-tracker-cat-edit');
 			});
 
+		// Reference field — only when BuJo bridge is available; editing preserves
+		// any existing reference even when BuJo is currently disabled.
+		if (this.plugin.bujoBridge.isAvailable() || this.reference) {
+			const refSetting = new Setting(contentEl)
+				.setName('Reference')
+				.setDesc('Optional Topic or JIRA ticket.');
+			this.referenceDisplayEl = refSetting.controlEl.createSpan({
+				cls: 'time-tracker-ref-display',
+			});
+			this.renderReferenceDisplay();
+
+			if (this.plugin.bujoBridge.isAvailable()) {
+				refSetting.addButton(btn => {
+					btn.setButtonText('Pick…')
+						.onClick(() => this.openReferencePicker());
+				});
+			}
+			refSetting.addButton(btn => {
+				btn.setButtonText('Clear')
+					.onClick(() => {
+						this.reference = null;
+						this.renderReferenceDisplay();
+					});
+			});
+		}
+
 		const btnRow = new Setting(contentEl);
 		btnRow.addButton(btn => {
 			btn.setButtonText('Save')
@@ -179,6 +233,32 @@ export class EditEntryModal extends Modal {
 		setTimeout(() => descInput!.inputEl.focus(), 50);
 	}
 
+	private openReferencePicker(): void {
+		new ReferenceSuggestModal(
+			this.app,
+			this.plugin.bujoBridge,
+			(ref) => {
+				this.reference = ref;
+				this.renderReferenceDisplay();
+			},
+			{ initial: this.reference, title: 'Attach a reference' }
+		).open();
+	}
+
+	private renderReferenceDisplay(): void {
+		if (!this.referenceDisplayEl) return;
+		this.referenceDisplayEl.empty();
+		const formatted = formatReferenceForDisplay(this.reference ?? undefined, this.plugin.bujoBridge);
+		if (!formatted) {
+			this.referenceDisplayEl.addClass('time-tracker-ref-empty');
+			this.referenceDisplayEl.setText('none');
+			return;
+		}
+		this.referenceDisplayEl.removeClass('time-tracker-ref-empty');
+		this.referenceDisplayEl.setText(formatted.label);
+		if (formatted.tooltip) this.referenceDisplayEl.setAttr('title', formatted.tooltip);
+	}
+
 	private updateDuration(): void {
 		if (!this.durationEl || !this.startTime || !this.endTime) {
 			if (this.durationEl) this.durationEl.textContent = '-';
@@ -186,7 +266,8 @@ export class EditEntryModal extends Modal {
 		}
 		const hours = this.computeDuration(this.startTime, this.endTime);
 		if (hours !== null && hours > 0) {
-			this.durationEl.textContent = `${Math.round(hours * 100) / 100}h`;
+			const rounded = roundEndTime(this.startTime, this.endTime, this.plugin.settings.roundingMode);
+			this.durationEl.textContent = `${rounded.durationHours}h`;
 		} else {
 			this.durationEl.textContent = '-';
 		}
@@ -208,15 +289,23 @@ export class EditEntryModal extends Modal {
 		const durationHours = this.computeDuration(this.startTime, this.endTime);
 		if (!durationHours || durationHours <= 0) return;
 
+		const rounded = roundEndTime(this.startTime, this.endTime, this.plugin.settings.roundingMode);
+
 		const updated: TimeEntry = {
 			id: `${this.selectedEntry.date}:${this.startTime}`,
 			date: this.selectedEntry.date,
 			startTime: this.startTime,
-			endTime: this.endTime,
-			durationHours: Math.round(durationHours * 100) / 100,
+			endTime: rounded.endTime,
+			durationHours: rounded.durationHours,
 			description: this.description.trim(),
 			category: this.category.trim() || null,
+			...(this.reference ? { reference: this.reference } : {}),
 		};
+
+		// Overlap check — exclude the row being edited so it doesn't match itself.
+		if (!await this.plugin.confirmNoOverlaps(updated, this.selectedEntry.startTime)) {
+			return; // user cancelled; keep the edit form open so they can adjust times
+		}
 
 		this.close();
 		await this.plugin.timeEntryService.updateEntry(
@@ -225,7 +314,7 @@ export class EditEntryModal extends Modal {
 			updated
 		);
 		this.plugin.refreshStatusBar();
-		new Notice(`Updated log: ${updated.durationHours}h - ${updated.description}`);
+		notify(`Updated log: ${updated.durationHours}h - ${updated.description}`, 'success');
 	}
 
 	private async confirmDelete(entry: TimeEntry): Promise<void> {
@@ -250,7 +339,7 @@ export class EditEntryModal extends Modal {
 					this.close();
 					await this.plugin.timeEntryService.deleteEntry(entry.date, entry.startTime);
 					this.plugin.refreshStatusBar();
-					new Notice(`Deleted log: ${label}`);
+					notify(`Deleted log: ${label}`, 'success');
 				});
 		});
 		btnRow.addButton(btn => {
