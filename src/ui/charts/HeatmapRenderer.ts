@@ -443,7 +443,12 @@ export function renderMonthCalendar(
 			hoursText.setAttribute('x', String(x + CELL / 2));
 			hoursText.setAttribute('y', String(y + CELL - 8));
 			hoursText.setAttribute('text-anchor', 'middle');
-			hoursText.setAttribute('class', 'time-tracker-month-hours-label');
+			hoursText.setAttribute(
+				'class',
+				level === 5
+					? 'time-tracker-month-hours-label is-overtime'
+					: 'time-tracker-month-hours-label'
+			);
 			hoursText.setAttribute('pointer-events', 'none');
 			hoursText.textContent = `${hours}h`;
 			g.appendChild(hoursText);

@@ -363,8 +363,17 @@
 .time-tracker-month-hours-label {
 	font-size: 11px;
 	font-weight: 600;
-	fill: var(--text-on-accent, var(--text-normal));
-	mix-blend-mode: difference;
+	fill: #ffffff;
+	paint-order: stroke;
+	stroke: rgba(0, 0, 0, 0.55);
+	stroke-width: 2.5px;
+	stroke-linejoin: round;
+}
+
+.time-tracker-month-hours-label.is-overtime {
+	fill: #2a0808;
+	stroke: none;
+	font-weight: 700;
 }
 
 .time-tracker-month-cell-group rect {
